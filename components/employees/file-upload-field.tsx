@@ -5,6 +5,8 @@ import { Loader2, UploadCloud } from "lucide-react";
 type FileUploadFieldProps = {
   id: string;
   label: string;
+  /** Red asterisk after label (required field). */
+  requiredMark?: boolean;
   description?: string;
   value: string | undefined;
   error?: string;
@@ -16,6 +18,7 @@ type FileUploadFieldProps = {
 export function FileUploadField({
   id,
   label,
+  requiredMark,
   description,
   value,
   error,
@@ -30,6 +33,14 @@ export function FileUploadField({
         className="block text-sm font-medium text-slate-800 dark:text-slate-200"
       >
         {label}
+        {requiredMark ? (
+          <span
+            className="ml-0.5 text-red-600 dark:text-red-400"
+            aria-hidden="true"
+          >
+            *
+          </span>
+        ) : null}
       </label>
       {description ? (
         <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>

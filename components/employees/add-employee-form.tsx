@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   addEmployeeSchema,
@@ -13,6 +13,10 @@ import {
 } from "@/lib/validations/add-employee-form";
 import { createClient } from "@/lib/supabase/client";
 import { EmployeeDocUploadField } from "./employee-doc-upload-field";
+import { SearchableCombobox } from "./searchable-combobox";
+import { SocialPlatformIcon } from "./social-platform-icons";
+import { normalizeSocialLinksForDb } from "@/lib/social-links";
+import type { SocialLinkKey } from "@/lib/social-links";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,23 +25,30 @@ const inter = Inter({
 
 const defaultValues: AddEmployeeFormValues = {
   full_name: "",
+  status: "Active",
   father_name: "",
   dob: "",
   cnic_no: "",
   ss_eubi_no: "",
   phone_no: "",
+  city: "",
   address: "",
   department: "",
   section: "",
   education: "",
   experience: "",
-  social_media_link: "",
+  social_instagram: "",
+  social_facebook: "",
+  social_tiktok: "",
+  social_youtube: "",
+  social_snapchat: "",
+  social_twitter: "",
   email_address: "",
   reference_info: "",
-  family_name: "",
   family_father_name: "",
   family_cnic: "",
   family_phone: "",
+  family_phone_alt: "",
   profile_image: "",
   cnic_front: "",
   cnic_back: "",
@@ -46,6 +57,18 @@ const defaultValues: AddEmployeeFormValues = {
   father_cnic_back: "",
   additional_document: "",
 };
+
+const TABS = [
+  { id: "personal", label: "Personal" },
+  { id: "work", label: "Work & education" },
+  { id: "social", label: "Social & reference" },
+  { id: "family", label: "Family" },
+  { id: "documents", label: "Documents" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+type ConfigOptionRow = { id: string; title: string };
 
 type DocFieldKey =
   | "profile_image"
@@ -66,45 +89,65 @@ const DOC_SLUGS: Record<DocFieldKey, string> = {
   additional_document: "additional-doc",
 };
 
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200/90 bg-white p-8 shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)] sm:p-10">
-      <header className="mb-8 border-b border-slate-100 pb-6 dark:border-slate-800">
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          {title}
-        </h2>
-        {description ? (
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-            {description}
-          </p>
-        ) : null}
-      </header>
-      {children}
-    </section>
-  );
-}
-
 const labelClass =
   "block text-sm font-medium text-slate-800 dark:text-slate-200";
 const inputClass =
   "mt-1.5 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/[0.08] dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500 dark:focus:ring-slate-400/20";
 const errorClass = "mt-1.5 text-sm text-red-600 dark:text-red-400";
 
-export function AddEmployeeForm() {
+function ReqStar() {
+  return (
+    <span className="ml-0.5 text-red-600 dark:text-red-400" aria-hidden="true">
+      *
+    </span>
+  );
+}
+
+const tabOrder = TABS.map((t) => t.id);
+
+const SOCIAL_PLATFORM_FIELDS: {
+  key: SocialLinkKey;
+  name:
+    | "social_instagram"
+    | "social_facebook"
+    | "social_tiktok"
+    | "social_youtube"
+    | "social_snapchat"
+    | "social_twitter";
+  label: string;
+}[] = [
+  { key: "instagram", name: "social_instagram", label: "Instagram" },
+  { key: "facebook", name: "social_facebook", label: "Facebook" },
+  { key: "tiktok", name: "social_tiktok", label: "TikTok" },
+  { key: "youtube", name: "social_youtube", label: "YouTube" },
+  { key: "snapchat", name: "social_snapchat", label: "Snapchat" },
+  { key: "twitter", name: "social_twitter", label: "Twitter" },
+];
+
+type AddEmployeeFormProps = {
+  editEmployeeId?: string;
+};
+
+function extractAdditionalDocUrl(other: unknown): string {
+  if (!Array.isArray(other) || other.length === 0) return "";
+  const first = other[0] as { url?: string };
+  return typeof first?.url === "string" ? first.url : "";
+}
+
+export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   const router = useRouter();
-  const [draftId, setDraftId] = useState(() => crypto.randomUUID());
+  const [loadingEmployee, setLoadingEmployee] = useState(!!editEmployeeId);
+  const [draftId, setDraftId] = useState(() => editEmployeeId ?? crypto.randomUUID());
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>("personal");
+  const [departments, setDepartments] = useState<ConfigOptionRow[]>([]);
+  const [sections, setSections] = useState<ConfigOptionRow[]>([]);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const {
     register,
+    control,
     handleSubmit,
     reset,
     setValue,
@@ -118,6 +161,124 @@ export function AddEmployeeForm() {
   });
 
   const values = watch();
+  const fatherName = watch("father_name");
+
+  const canSave = useMemo(
+    () => addEmployeeSchema.safeParse(values).success,
+    [values],
+  );
+
+  function handleCloseForm() {
+    router.push("/employees");
+  }
+
+  useEffect(() => {
+    setValue("family_father_name", fatherName ?? "", {
+      shouldValidate: true,
+      shouldDirty: false,
+    });
+  }, [fatherName, setValue]);
+
+  useEffect(() => {
+    const id = editEmployeeId;
+    if (!id) {
+      setLoadingEmployee(false);
+      return;
+    }
+    const employeeId: string = id;
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function loadEmployeeForEdit() {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("*")
+        .eq("id", employeeId)
+        .single();
+      if (cancelled) return;
+      if (error || !data) {
+        toast.error("Could not load employee", {
+          description: error?.message ?? "Not found",
+        });
+        router.push("/employees");
+        return;
+      }
+      const d = data as Record<string, unknown>;
+      const sl = (d.social_links as Record<string, string | null> | null) ?? {};
+      reset({
+        full_name: String(d.full_name ?? ""),
+        status: d.status === "Deactive" ? "Deactive" : "Active",
+        father_name: String(d.father_name ?? ""),
+        dob: String(d.dob ?? ""),
+        cnic_no: String(d.cnic_no ?? ""),
+        ss_eubi_no: String(d.ss_eubi_no ?? ""),
+        phone_no: String(d.phone_no ?? ""),
+        city: String(d.city ?? ""),
+        address: String(d.address ?? ""),
+        department: String(d.department ?? ""),
+        section: String(d.section ?? ""),
+        education: String(d.education ?? ""),
+        experience: String(d.experience ?? ""),
+        social_instagram: String(sl.instagram ?? ""),
+        social_facebook: String(sl.facebook ?? ""),
+        social_tiktok: String(sl.tiktok ?? ""),
+        social_youtube: String(sl.youtube ?? ""),
+        social_snapchat: String(sl.snapchat ?? ""),
+        social_twitter: String(sl.twitter ?? ""),
+        email_address: String(d.email_address ?? ""),
+        reference_info: String(d.reference_info ?? ""),
+        family_father_name: String(d.family_father_name ?? ""),
+        family_cnic: String(d.family_cnic ?? ""),
+        family_phone: String(d.family_phone ?? ""),
+        family_phone_alt: String(d.family_phone_alt ?? ""),
+        profile_image: String(d.profile_image ?? ""),
+        cnic_front: String(d.cnic_front ?? ""),
+        cnic_back: String(d.cnic_back ?? ""),
+        father_image: String(d.father_image ?? ""),
+        father_cnic_front: String(d.father_cnic_front ?? ""),
+        father_cnic_back: String(d.father_cnic_back ?? ""),
+        additional_document: extractAdditionalDocUrl(d.other_documents),
+      });
+      setDraftId(employeeId);
+      setLoadingEmployee(false);
+    }
+
+    void loadEmployeeForEdit();
+    return () => {
+      cancelled = true;
+    };
+  }, [editEmployeeId, reset, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function loadConfigurationOptions() {
+      setConfigLoading(true);
+      setConfigError(null);
+      const [dRes, sRes] = await Promise.all([
+        supabase.from("departments").select("id, title").order("title"),
+        supabase.from("sections").select("id, title").order("title"),
+      ]);
+      if (cancelled) return;
+      if (dRes.error || sRes.error) {
+        setConfigError(
+          dRes.error?.message ?? sRes.error?.message ?? "Could not load options",
+        );
+        setDepartments([]);
+        setSections([]);
+      } else {
+        setDepartments((dRes.data as ConfigOptionRow[]) ?? []);
+        setSections((sRes.data as ConfigOptionRow[]) ?? []);
+      }
+      setConfigLoading(false);
+    }
+
+    void loadConfigurationOptions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function docFolder(field: DocFieldKey) {
     return `drafts/${draftId}/${DOC_SLUGS[field]}`;
@@ -126,6 +287,18 @@ export function AddEmployeeForm() {
   function onDocUploaded(field: DocFieldKey, url: string) {
     setValue(field, url, { shouldDirty: true, shouldValidate: true });
     clearErrors(field);
+  }
+
+  const tabIndex = tabOrder.indexOf(activeTab);
+  const isFirstTab = tabIndex <= 0;
+  const isLastTab = tabIndex >= tabOrder.length - 1;
+
+  function goPrev() {
+    if (!isFirstTab) setActiveTab(tabOrder[tabIndex - 1] as TabId);
+  }
+
+  function goNext() {
+    if (!isLastTab) setActiveTab(tabOrder[tabIndex + 1] as TabId);
   }
 
   async function onSubmit(data: AddEmployeeFormValues) {
@@ -142,33 +315,95 @@ export function AddEmployeeForm() {
           ]
         : [];
 
-    const { error } = await supabase.from("employees").insert({
+    const social_links = normalizeSocialLinksForDb({
+      instagram: data.social_instagram,
+      facebook: data.social_facebook,
+      tiktok: data.social_tiktok,
+      youtube: data.social_youtube,
+      snapchat: data.social_snapchat,
+      twitter: data.social_twitter,
+    });
+
+    const payload = {
       full_name: data.full_name,
       father_name: data.father_name || null,
       dob: data.dob || null,
       cnic_no: data.cnic_no,
       ss_eubi_no: data.ss_eubi_no || null,
       phone_no: data.phone_no || null,
+      city: data.city || null,
       address: data.address || null,
       department: data.department,
       section: data.section || null,
+      status: data.status,
       education: data.education || null,
       experience: data.experience || null,
-      social_media_link: data.social_media_link || null,
+      social_media_link: null,
+      social_links: social_links,
       email_address: data.email_address || null,
       reference_info: data.reference_info || null,
-      family_name: data.family_name || null,
+      family_name: null,
       family_father_name: data.family_father_name || null,
       family_cnic: data.family_cnic || null,
       family_phone: data.family_phone || null,
+      family_phone_alt: data.family_phone_alt || null,
       profile_image: data.profile_image,
-      cnic_front: data.cnic_front,
-      cnic_back: data.cnic_back,
-      father_image: data.father_image,
-      father_cnic_front: data.father_cnic_front,
-      father_cnic_back: data.father_cnic_back,
+      cnic_front: data.cnic_front || null,
+      cnic_back: data.cnic_back || null,
+      father_image: data.father_image || null,
+      father_cnic_front: data.father_cnic_front || null,
+      father_cnic_back: data.father_cnic_back || null,
       other_documents,
-    });
+    };
+
+    const selectCols =
+      "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, phone_no, city, department, section, status, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt";
+
+    if (editEmployeeId) {
+      const { data: updated, error } = await supabase
+        .from("employees")
+        .update(payload)
+        .eq("id", editEmployeeId)
+        .select(selectCols)
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          const msg = "This CNIC number is already registered.";
+          setSubmitError(msg);
+          setError("cnic_no", { message: "Already registered" });
+          toast.error("Could not update employee", { description: msg });
+          setActiveTab("personal");
+        } else {
+          setSubmitError(error.message);
+          toast.error("Could not update employee", {
+            description: error.message,
+          });
+        }
+        return;
+      }
+
+      toast.success("Employee updated", {
+        description: `${data.full_name} has been saved.`,
+        duration: 4500,
+      });
+
+      reset(defaultValues);
+      clearErrors();
+      setSubmitError(null);
+      setDraftId(crypto.randomUUID());
+      setActiveTab("personal");
+
+      router.push("/employees");
+      router.refresh();
+      return;
+    }
+
+    const { data: inserted, error } = await supabase
+      .from("employees")
+      .insert(payload)
+      .select(selectCols)
+      .single();
 
     if (error) {
       if (error.code === "23505") {
@@ -176,6 +411,7 @@ export function AddEmployeeForm() {
         setSubmitError(msg);
         setError("cnic_no", { message: "Already registered" });
         toast.error("Could not save employee", { description: msg });
+        setActiveTab("personal");
       } else {
         setSubmitError(error.message);
         toast.error("Could not save employee", {
@@ -194,369 +430,618 @@ export function AddEmployeeForm() {
     clearErrors();
     setSubmitError(null);
     setDraftId(crypto.randomUUID());
+    setActiveTab("personal");
 
     router.push("/employees");
     router.refresh();
   }
 
+  if (loadingEmployee) {
+    return (
+      <div
+        className={`${inter.className} flex min-h-[240px] items-center justify-center gap-3 text-slate-600 dark:text-slate-400`}
+      >
+        <Loader2 className="h-8 w-8 shrink-0 animate-spin" aria-hidden />
+        <span className="text-sm">Loading employee…</span>
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`${inter.className} space-y-12 text-slate-900 antialiased dark:text-slate-100`}
+      className={`${inter.className} text-slate-900 antialiased dark:text-slate-100`}
     >
       {submitError ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+        <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
           {submitError}
         </p>
       ) : null}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
-        <SectionCard
-          title="Personal information"
-          description="Legal identity and contact basics for this employee record."
-        >
-          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label htmlFor="full_name" className={labelClass}>
-                Full name
-              </label>
-              <input
-                id="full_name"
-                type="text"
-                autoComplete="name"
-                className={inputClass}
-                {...register("full_name")}
-              />
-              {errors.full_name ? (
-                <p className={errorClass} role="alert">
-                  {errors.full_name.message}
-                </p>
-              ) : null}
-            </div>
-            <div>
-              <label htmlFor="father_name" className={labelClass}>
-                Father’s name
-              </label>
-              <input
-                id="father_name"
-                type="text"
-                className={inputClass}
-                {...register("father_name")}
-              />
-            </div>
-            <div>
-              <label htmlFor="dob" className={labelClass}>
-                Date of birth
-              </label>
-              <input
-                id="dob"
-                type="date"
-                className={inputClass}
-                {...register("dob")}
-              />
-            </div>
-            <div>
-              <label htmlFor="cnic_no" className={labelClass}>
-                CNIC / national ID
-              </label>
-              <input
-                id="cnic_no"
-                type="text"
-                autoComplete="off"
-                className={inputClass}
-                {...register("cnic_no")}
-              />
-              {errors.cnic_no ? (
-                <p className={errorClass} role="alert">
-                  {errors.cnic_no.message}
-                </p>
-              ) : null}
-            </div>
-            <div>
-              <label htmlFor="ss_eubi_no" className={labelClass}>
-                SS / EUBI number
-              </label>
-              <input
-                id="ss_eubi_no"
-                type="text"
-                className={inputClass}
-                {...register("ss_eubi_no")}
-              />
-            </div>
-            <div>
-              <label htmlFor="phone_no" className={labelClass}>
-                Phone number
-              </label>
-              <input
-                id="phone_no"
-                type="tel"
-                autoComplete="tel"
-                className={inputClass}
-                {...register("phone_no")}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="address" className={labelClass}>
-                Address
-              </label>
-              <textarea
-                id="address"
-                rows={3}
-                className={`${inputClass} resize-y`}
-                {...register("address")}
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Work & education"
-          description="Department, role context, and professional background."
-        >
-          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="department" className={labelClass}>
-                Department
-              </label>
-              <input
-                id="department"
-                type="text"
-                className={inputClass}
-                {...register("department")}
-              />
-              {errors.department ? (
-                <p className={errorClass} role="alert">
-                  {errors.department.message}
-                </p>
-              ) : null}
-            </div>
-            <div>
-              <label htmlFor="section" className={labelClass}>
-                Section
-              </label>
-              <input
-                id="section"
-                type="text"
-                className={inputClass}
-                {...register("section")}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="education" className={labelClass}>
-                Education
-              </label>
-              <textarea
-                id="education"
-                rows={3}
-                className={`${inputClass} resize-y`}
-                {...register("education")}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="experience" className={labelClass}>
-                Experience
-              </label>
-              <textarea
-                id="experience"
-                rows={3}
-                className={`${inputClass} resize-y`}
-                {...register("experience")}
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Social & reference"
-          description="Optional links and reference notes for verification."
-        >
-          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label htmlFor="social_media_link" className={labelClass}>
-                Social media link
-              </label>
-              <input
-                id="social_media_link"
-                type="url"
-                placeholder="https://"
-                className={inputClass}
-                {...register("social_media_link")}
-              />
-            </div>
-            <div>
-              <label htmlFor="email_address" className={labelClass}>
-                Email address
-              </label>
-              <input
-                id="email_address"
-                type="email"
-                autoComplete="email"
-                className={inputClass}
-                {...register("email_address")}
-              />
-              {errors.email_address ? (
-                <p className={errorClass} role="alert">
-                  {errors.email_address.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="reference_info" className={labelClass}>
-                Reference information
-              </label>
-              <textarea
-                id="reference_info"
-                rows={4}
-                className={`${inputClass} resize-y`}
-                placeholder="Name, relationship, contact details…"
-                {...register("reference_info")}
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Family details"
-          description="Next of kin or family contact on record."
-        >
-          <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-            <div>
-              <label htmlFor="family_name" className={labelClass}>
-                Family name
-              </label>
-              <input
-                id="family_name"
-                type="text"
-                className={inputClass}
-                {...register("family_name")}
-              />
-            </div>
-            <div>
-              <label htmlFor="family_father_name" className={labelClass}>
-                Father’s name (family)
-              </label>
-              <input
-                id="family_father_name"
-                type="text"
-                className={inputClass}
-                {...register("family_father_name")}
-              />
-            </div>
-            <div>
-              <label htmlFor="family_cnic" className={labelClass}>
-                Family CNIC
-              </label>
-              <input
-                id="family_cnic"
-                type="text"
-                className={inputClass}
-                {...register("family_cnic")}
-              />
-            </div>
-            <div>
-              <label htmlFor="family_phone" className={labelClass}>
-                Family phone
-              </label>
-              <input
-                id="family_phone"
-                type="tel"
-                className={inputClass}
-                {...register("family_phone")}
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <SectionCard
-          title="Document uploads"
-          description="Images are uploaded to secure storage when selected. Thumbnails appear after upload."
-        >
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="profile_image"
-                label="Profile photo"
-                description="Head-and-shoulders, neutral background."
-                folderPath={docFolder("profile_image")}
-                value={values.profile_image}
-                validationError={errors.profile_image?.message}
-                onUploaded={(url) => onDocUploaded("profile_image", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="cnic_front"
-                label="CNIC — front"
-                folderPath={docFolder("cnic_front")}
-                value={values.cnic_front}
-                validationError={errors.cnic_front?.message}
-                onUploaded={(url) => onDocUploaded("cnic_front", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="cnic_back"
-                label="CNIC — back"
-                folderPath={docFolder("cnic_back")}
-                value={values.cnic_back}
-                validationError={errors.cnic_back?.message}
-                onUploaded={(url) => onDocUploaded("cnic_back", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="father_image"
-                label="Father’s photo"
-                folderPath={docFolder("father_image")}
-                value={values.father_image}
-                validationError={errors.father_image?.message}
-                onUploaded={(url) => onDocUploaded("father_image", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="father_cnic_front"
-                label="Father’s CNIC — front"
-                folderPath={docFolder("father_cnic_front")}
-                value={values.father_cnic_front}
-                validationError={errors.father_cnic_front?.message}
-                onUploaded={(url) => onDocUploaded("father_cnic_front", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
-              <EmployeeDocUploadField
-                id="father_cnic_back"
-                label="Father’s CNIC — back"
-                folderPath={docFolder("father_cnic_back")}
-                value={values.father_cnic_back}
-                validationError={errors.father_cnic_back?.message}
-                onUploaded={(url) => onDocUploaded("father_cnic_back", url)}
-              />
-            </div>
-            <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50 sm:col-span-2 lg:col-span-1">
-              <EmployeeDocUploadField
-                id="additional_document"
-                label="Additional document (optional)"
-                description="Any extra supporting image."
-                folderPath={docFolder("additional_document")}
-                value={values.additional_document}
-                validationError={errors.additional_document?.message}
-                onUploaded={(url) => onDocUploaded("additional_document", url)}
-              />
-            </div>
-          </div>
-        </SectionCard>
-
-        <div className="flex justify-end border-t border-slate-200/80 pt-8 dark:border-slate-800">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-0">
+        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+          <div
+            role="tablist"
+            aria-label="Employee form sections"
+            className="flex flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            ) : null}
-            Save employee
-          </button>
+            {TABS.map((tab) => {
+              const selected = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={selected}
+                  aria-controls={`panel-${tab.id}`}
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={[
+                    "rounded-lg px-3 py-2.5 text-sm font-medium transition sm:px-4",
+                    selected
+                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600"
+                      : "text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100",
+                  ].join(" ")}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="p-6 sm:p-10">
+            <div
+              role="tabpanel"
+              id="panel-personal"
+              aria-labelledby="tab-personal"
+              hidden={activeTab !== "personal"}
+            >
+              <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="full_name" className={labelClass}>
+                    Full name
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="full_name"
+                    type="text"
+                    autoComplete="name"
+                    className={inputClass}
+                    {...register("full_name")}
+                  />
+                  {errors.full_name ? (
+                    <p className={errorClass} role="alert">
+                      {errors.full_name.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="status" className={labelClass}>
+                    Status
+                    <ReqStar />
+                  </label>
+                  <select
+                    id="status"
+                    className={inputClass}
+                    {...register("status")}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Deactive">Deactive</option>
+                  </select>
+                  {errors.status ? (
+                    <p className={errorClass} role="alert">
+                      {errors.status.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="father_name" className={labelClass}>
+                    Father’s name
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="father_name"
+                    type="text"
+                    className={inputClass}
+                    {...register("father_name")}
+                  />
+                  {errors.father_name ? (
+                    <p className={errorClass} role="alert">
+                      {errors.father_name.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="dob" className={labelClass}>
+                    Date of birth
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="dob"
+                    type="date"
+                    className={inputClass}
+                    {...register("dob")}
+                  />
+                  {errors.dob ? (
+                    <p className={errorClass} role="alert">
+                      {errors.dob.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="cnic_no" className={labelClass}>
+                    CNIC / national ID
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="cnic_no"
+                    type="text"
+                    autoComplete="off"
+                    className={inputClass}
+                    {...register("cnic_no")}
+                  />
+                  {errors.cnic_no ? (
+                    <p className={errorClass} role="alert">
+                      {errors.cnic_no.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="ss_eubi_no" className={labelClass}>
+                    SS / EUBI number
+                  </label>
+                  <input
+                    id="ss_eubi_no"
+                    type="text"
+                    className={inputClass}
+                    {...register("ss_eubi_no")}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="phone_no" className={labelClass}>
+                    Phone number
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="phone_no"
+                    type="tel"
+                    autoComplete="tel"
+                    className={inputClass}
+                    {...register("phone_no")}
+                  />
+                  {errors.phone_no ? (
+                    <p className={errorClass} role="alert">
+                      {errors.phone_no.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="city" className={labelClass}>
+                    City
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="city"
+                    type="text"
+                    autoComplete="address-level2"
+                    className={inputClass}
+                    {...register("city")}
+                  />
+                  {errors.city ? (
+                    <p className={errorClass} role="alert">
+                      {errors.city.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="address" className={labelClass}>
+                    Address
+                    <ReqStar />
+                  </label>
+                  <textarea
+                    id="address"
+                    rows={3}
+                    className={`${inputClass} resize-y`}
+                    {...register("address")}
+                  />
+                  {errors.address ? (
+                    <p className={errorClass} role="alert">
+                      {errors.address.message}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="panel-work"
+              aria-labelledby="tab-work"
+              hidden={activeTab !== "work"}
+            >
+              <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+                {configError ? (
+                  <div
+                    className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+                    role="alert"
+                  >
+                    Could not load departments/sections: {configError}. Check
+                    Configuration in Supabase and try again.
+                  </div>
+                ) : null}
+                <div>
+                  <label htmlFor="department" className={labelClass}>
+                    Department
+                    <ReqStar />
+                  </label>
+                  <Controller
+                    name="department"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchableCombobox
+                        id="department"
+                        options={departments}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        loading={configLoading}
+                        disabled={configLoading || departments.length === 0}
+                        inputClassName={inputClass}
+                        emptyMessage="No departments — add in Configuration"
+                        searchPlaceholder="Search or select department"
+                        aria-invalid={Boolean(errors.department)}
+                      />
+                    )}
+                  />
+                  {errors.department ? (
+                    <p className={errorClass} role="alert">
+                      {errors.department.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="section" className={labelClass}>
+                    Section
+                    <ReqStar />
+                  </label>
+                  <Controller
+                    name="section"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchableCombobox
+                        id="section"
+                        options={sections}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        loading={configLoading}
+                        disabled={configLoading || sections.length === 0}
+                        inputClassName={inputClass}
+                        emptyMessage="No sections — add in Configuration"
+                        searchPlaceholder="Search or select section"
+                        aria-invalid={Boolean(errors.section)}
+                      />
+                    )}
+                  />
+                  {errors.section ? (
+                    <p className={errorClass} role="alert">
+                      {errors.section.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="education" className={labelClass}>
+                    Education
+                  </label>
+                  <textarea
+                    id="education"
+                    rows={3}
+                    className={`${inputClass} resize-y`}
+                    {...register("education")}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="experience" className={labelClass}>
+                    Experience
+                  </label>
+                  <textarea
+                    id="experience"
+                    rows={3}
+                    className={`${inputClass} resize-y`}
+                    {...register("experience")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="panel-social"
+              aria-labelledby="tab-social"
+              hidden={activeTab !== "social"}
+            >
+              <div className="flex flex-col gap-8">
+                <div className="max-w-xl">
+                  <label htmlFor="email_address" className={labelClass}>
+                    Email address
+                  </label>
+                  <input
+                    id="email_address"
+                    type="email"
+                    autoComplete="email"
+                    className={inputClass}
+                    {...register("email_address")}
+                  />
+                  {errors.email_address ? (
+                    <p className={errorClass} role="alert">
+                      {errors.email_address.message}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="w-full">
+                  <label htmlFor="reference_info" className={labelClass}>
+                    Reference information
+                  </label>
+                  <textarea
+                    id="reference_info"
+                    rows={4}
+                    className={`${inputClass} resize-y`}
+                    placeholder="Name, relationship, contact details…"
+                    {...register("reference_info")}
+                  />
+                </div>
+
+                <div>
+                  <p className="mb-4 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Social media{" "}
+                    <span className="font-normal text-slate-500 dark:text-slate-400">
+                      (optional — up to 6 links)
+                    </span>
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {SOCIAL_PLATFORM_FIELDS.map(({ key, name, label }) => (
+                      <div
+                        key={name}
+                        className="flex gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-900/40"
+                      >
+                        <SocialPlatformIcon platform={key} />
+                        <div className="min-w-0 flex-1">
+                          <label htmlFor={name} className={labelClass}>
+                            {label}
+                          </label>
+                          <input
+                            id={name}
+                            type="url"
+                            inputMode="url"
+                            autoComplete="off"
+                            placeholder="https://"
+                            className={inputClass}
+                            {...register(name)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="panel-family"
+              aria-labelledby="tab-family"
+              hidden={activeTab !== "family"}
+            >
+              <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="family_father_name" className={labelClass}>
+                    Father name
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="family_father_name"
+                    type="text"
+                    readOnly
+                    aria-readonly="true"
+                    aria-required="true"
+                    title="Synced from Personal → Father’s name"
+                    className={`${inputClass} cursor-default bg-slate-50 text-slate-700 dark:bg-slate-900/70 dark:text-slate-200`}
+                    {...register("family_father_name")}
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    Same as Personal → Father’s name
+                  </p>
+                  {errors.family_father_name ? (
+                    <p className={errorClass} role="alert">
+                      {errors.family_father_name.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="family_cnic" className={labelClass}>
+                    Father CNIC
+                  </label>
+                  <input
+                    id="family_cnic"
+                    type="text"
+                    autoComplete="off"
+                    className={inputClass}
+                    {...register("family_cnic")}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="family_phone" className={labelClass}>
+                    Father phone (main)
+                    <ReqStar />
+                  </label>
+                  <input
+                    id="family_phone"
+                    type="tel"
+                    autoComplete="tel"
+                    aria-required="true"
+                    className={inputClass}
+                    {...register("family_phone")}
+                  />
+                  {errors.family_phone ? (
+                    <p className={errorClass} role="alert">
+                      {errors.family_phone.message}
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <label htmlFor="family_phone_alt" className={labelClass}>
+                    Father phone (alternate)
+                  </label>
+                  <input
+                    id="family_phone_alt"
+                    type="tel"
+                    autoComplete="tel"
+                    className={inputClass}
+                    {...register("family_phone_alt")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div
+              role="tabpanel"
+              id="panel-documents"
+              aria-labelledby="tab-documents"
+              hidden={activeTab !== "documents"}
+            >
+              <h2 className="mb-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                Document uploads
+              </h2>
+              <p className="mb-8 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                Images are uploaded to secure storage when selected. Thumbnails
+                appear after upload.
+              </p>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="profile_image"
+                    label="Profile photo"
+                    requiredMark
+                    description="Head-and-shoulders, neutral background."
+                    folderPath={docFolder("profile_image")}
+                    value={values.profile_image}
+                    validationError={errors.profile_image?.message}
+                    onUploaded={(url) => onDocUploaded("profile_image", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="cnic_front"
+                    label="CNIC — front"
+                    folderPath={docFolder("cnic_front")}
+                    value={values.cnic_front}
+                    validationError={errors.cnic_front?.message}
+                    onUploaded={(url) => onDocUploaded("cnic_front", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="cnic_back"
+                    label="CNIC — back"
+                    folderPath={docFolder("cnic_back")}
+                    value={values.cnic_back}
+                    validationError={errors.cnic_back?.message}
+                    onUploaded={(url) => onDocUploaded("cnic_back", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="father_image"
+                    label="Father’s photo"
+                    folderPath={docFolder("father_image")}
+                    value={values.father_image}
+                    validationError={errors.father_image?.message}
+                    onUploaded={(url) => onDocUploaded("father_image", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="father_cnic_front"
+                    label="Father’s CNIC — front"
+                    folderPath={docFolder("father_cnic_front")}
+                    value={values.father_cnic_front}
+                    validationError={errors.father_cnic_front?.message}
+                    onUploaded={(url) => onDocUploaded("father_cnic_front", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50">
+                  <EmployeeDocUploadField
+                    id="father_cnic_back"
+                    label="Father’s CNIC — back"
+                    folderPath={docFolder("father_cnic_back")}
+                    value={values.father_cnic_back}
+                    validationError={errors.father_cnic_back?.message}
+                    onUploaded={(url) => onDocUploaded("father_cnic_back", url)}
+                  />
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-900/50 sm:col-span-2 lg:col-span-1">
+                  <EmployeeDocUploadField
+                    id="additional_document"
+                    label="Additional document (optional)"
+                    description="Any extra supporting image."
+                    folderPath={docFolder("additional_document")}
+                    value={values.additional_document}
+                    validationError={errors.additional_document?.message}
+                    onUploaded={(url) => onDocUploaded("additional_document", url)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={isFirstTab}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={isLastTab}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={handleCloseForm}
+                disabled={isSubmitting}
+                className="inline-flex min-w-[120px] items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                Close
+              </button>
+              <button
+                type="submit"
+                disabled={!canSave || isSubmitting}
+                title={
+                  canSave
+                    ? undefined
+                    : "Fill all required fields to save"
+                }
+                className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : null}
+                {editEmployeeId ? "Save changes" : "Save employee"}
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </div>

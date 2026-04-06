@@ -14,6 +14,7 @@ const titles: Record<string, string> = {
 function titleForPath(pathname: string) {
   if (titles[pathname]) return titles[pathname];
   if (pathname.startsWith("/employees/new")) return "Add employee";
+  if (/^\/employees\/[^/]+\/edit$/.test(pathname)) return "Edit employee";
   if (pathname.startsWith("/employees/")) return "Employee";
   if (pathname.startsWith("/configuration")) return "Configuration";
   if (pathname.startsWith("/dashboard")) return "Dashboard";

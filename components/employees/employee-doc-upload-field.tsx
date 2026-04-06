@@ -6,6 +6,7 @@ import { FileUploadField } from "./file-upload-field";
 type EmployeeDocUploadFieldProps = {
   id: string;
   label: string;
+  requiredMark?: boolean;
   description?: string;
   /** Folder path inside `employee-docs` (e.g. `drafts/<uuid>/profile`). */
   folderPath: string;
@@ -21,6 +22,7 @@ type EmployeeDocUploadFieldProps = {
 export function EmployeeDocUploadField({
   id,
   label,
+  requiredMark,
   description,
   folderPath,
   value,
@@ -36,6 +38,7 @@ export function EmployeeDocUploadField({
     <FileUploadField
       id={id}
       label={label}
+      requiredMark={requiredMark}
       description={description}
       value={value}
       error={message}
