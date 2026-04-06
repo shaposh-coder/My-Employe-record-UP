@@ -8,31 +8,59 @@ import {
   EmployeesColumnPicker,
   useEmployeesColumnVisibility,
 } from "@/components/employees/employees-column-picker";
-import {
-  EmployeesTable,
-  type EmployeeListRow,
-} from "@/components/employees/employees-table";
+import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
+import type { EmployeeListRow } from "@/components/employees/employee-list-row";
+import { EmployeesPagination } from "@/components/employees/employees-pagination";
+import { EmployeesTable } from "@/components/employees/employees-table";
 import { createClient } from "@/lib/supabase/client";
-import { fetchEmployeesForTable } from "@/lib/fetch-employees";
+import {
+  DEFAULT_EMPLOYEES_PAGE_SIZE,
+  EMPLOYEES_PAGE_SIZE_OPTIONS,
+  type EmployeesPageSize,
+  fetchEmployeesForTable,
+} from "@/lib/fetch-employees";
 
 export default function EmployeesPage() {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] =
+    useState<EmployeesPageSize>(DEFAULT_EMPLOYEES_PAGE_SIZE);
   const [rows, setRows] = useState<EmployeeListRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [ready, setReady] = useState(false);
+  const [listLoading, setListLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(
+    null,
+  );
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(
+    null,
+  );
   const { visibility, setVisibility } = useEmployeesColumnVisibility();
 
   const loadRows = useCallback(async () => {
-    const { rows: next, error } = await fetchEmployeesForTable();
-    setRows(next);
+    const { rows: next, total, error } = await fetchEmployeesForTable({
+      page,
+      pageSize,
+    });
     setLoadError(error);
-    return error;
-  }, []);
+    if (error) {
+      setRows([]);
+      setTotalCount(0);
+      return { rows: [] as EmployeeListRow[], total: 0, error };
+    }
+    setRows(next);
+    setTotalCount(total);
+    return { rows: next, total, error: null };
+  }, [page, pageSize]);
 
   useEffect(() => {
     let cancelled = false;
-    setReady(false);
+    setListLoading(true);
     void loadRows().then(() => {
-      if (!cancelled) setReady(true);
+      if (!cancelled) {
+        setListLoading(false);
+        setReady(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -65,10 +93,53 @@ export default function EmployeesPage() {
         return;
       }
       toast.success("Employee deleted");
-      void loadRows();
+      const result = await loadRows();
+      if (
+        result &&
+        !result.error &&
+        result.rows.length === 0 &&
+        page > 1
+      ) {
+        setPage((p) => p - 1);
+      }
+    },
+    [loadRows, page],
+  );
+
+  const handleToggleStatus = useCallback(
+    async (row: EmployeeListRow) => {
+      const current = row.status ?? "Active";
+      const next = current === "Active" ? "Deactive" : "Active";
+      setStatusUpdatingId(row.id);
+      try {
+        const supabase = createClient();
+        const { error } = await supabase
+          .from("employees")
+          .update({ status: next })
+          .eq("id", row.id);
+        if (error) {
+          toast.error("Could not update status", {
+            description: error.message,
+          });
+          return;
+        }
+        toast.success(
+          next === "Active"
+            ? "Employee is now Active"
+            : "Employee is now Deactive",
+        );
+        void loadRows();
+      } finally {
+        setStatusUpdatingId(null);
+      }
     },
     [loadRows],
   );
+
+  const handlePageSizeChange = useCallback((size: EmployeesPageSize) => {
+    setPageSize(size);
+    setPage(1);
+  }, []);
 
   return (
     <div>
@@ -107,12 +178,35 @@ export default function EmployeesPage() {
           Loading…
         </div>
       ) : (
-        <EmployeesTable
-          rows={rows}
-          visibility={visibility}
-          onDelete={handleDelete}
-        />
+        <div
+          className={
+            listLoading ? "pointer-events-none opacity-60 transition-opacity" : ""
+          }
+        >
+          <EmployeesTable
+            rows={rows}
+            visibility={visibility}
+            onDelete={handleDelete}
+            onEmployeeNameClick={(id) => setDetailEmployeeId(id)}
+            onToggleStatus={handleToggleStatus}
+            statusUpdatingId={statusUpdatingId}
+          />
+          <EmployeesPagination
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
+            total={totalCount}
+            disabled={listLoading}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       )}
+
+      <EmployeeDetailModal
+        employeeId={detailEmployeeId}
+        onClose={() => setDetailEmployeeId(null)}
+      />
     </div>
   );
 }

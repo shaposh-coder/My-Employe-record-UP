@@ -1,4 +1,4 @@
-import type { EmployeeListRow } from "@/components/employees/employees-table";
+import type { EmployeeListRow } from "@/components/employees/employee-list-row";
 
 /** Map a Supabase `employees` row (snake_case) to the directory table shape. */
 export function employeeListRowFromDbRow(

@@ -1,38 +1,10 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
-import type { SocialLinksRecord } from "@/lib/social-links";
+import type { CSSProperties, ReactNode } from "react";
 import type { EmployeeColumnId } from "@/lib/employee-table-columns";
 import { EmployeeSocialLinksCell } from "./employee-social-links-cell";
+import { EmployeeRowActionsMenu } from "./employee-row-actions-menu";
+import type { EmployeeListRow } from "./employee-list-row";
 
-export type EmployeeListRow = {
-  id: string;
-  /** Profile photo URL (Documents tab) */
-  profile_image: string | null;
-  full_name: string;
-  father_name: string | null;
-  dob: string | null;
-  cnic_no: string;
-  ss_eubi_no: string | null;
-  phone_no: string | null;
-  city: string | null;
-  department: string;
-  section: string | null;
-  education: string | null;
-  address: string | null;
-  experience: string | null;
-  social_media_link: string | null;
-  social_links: SocialLinksRecord | null;
-  email_address: string | null;
-  reference_info: string | null;
-  family_name: string | null;
-  family_father_name: string | null;
-  family_cnic: string | null;
-  family_phone: string | null;
-  family_phone_alt: string | null;
-  /** Active or Deactive — from Add Employee form */
-  status: string | null;
-};
+export type { EmployeeListRow };
 
 function fmt(value: string | null | undefined): ReactNode {
   if (value == null || String(value).trim() === "") {
@@ -86,25 +58,45 @@ type ColDef = {
   tdClass?: string;
 };
 
+function colWidthStyle(colId: EmployeeColumnId): CSSProperties | undefined {
+  if (colId === "image") return { width: "3.5rem" };
+  if (colId === "social") return { width: "4.5rem" };
+  if (colId === "action") return { width: "3.25rem" };
+  return undefined;
+}
+
 function buildColumnDefs(
   onDelete: (id: string) => void | Promise<void>,
+  onEmployeeNameClick: ((id: string) => void) | undefined,
+  onToggleStatus: ((row: EmployeeListRow) => void | Promise<void>) | undefined,
+  statusUpdatingId: string | null | undefined,
 ): ColDef[] {
   return [
     {
       id: "image",
       header: "IMAGE",
+      thClass: "text-left",
       cell: (row) => profileImageCell(row.profile_image),
-      tdClass: "w-14 min-w-[3.5rem]",
+      tdClass: "min-w-0 align-middle",
     },
     {
       id: "name",
       header: "NAME",
-      cell: (row) => (
-        <span className="font-medium text-slate-900 dark:text-slate-100">
-          {fmt(row.full_name)}
-        </span>
-      ),
-      tdClass: "max-w-[10rem]",
+      cell: (row) =>
+        onEmployeeNameClick ? (
+          <button
+            type="button"
+            onClick={() => onEmployeeNameClick(row.id)}
+            className="text-left font-medium text-slate-900 underline-offset-2 hover:underline dark:text-slate-100"
+          >
+            {fmt(row.full_name)}
+          </button>
+        ) : (
+          <span className="font-medium text-slate-900 dark:text-slate-100">
+            {fmt(row.full_name)}
+          </span>
+        ),
+      tdClass: "min-w-0",
     },
     {
       id: "father_name",
@@ -243,24 +235,15 @@ function buildColumnDefs(
     {
       id: "action",
       header: "ACTION",
+      thClass: "text-right",
+      tdClass: "whitespace-nowrap text-right align-middle",
       cell: (row) => (
-        <div className="flex items-center gap-0.5">
-          <Link
-            href={`/employees/${row.id}/edit`}
-            className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            aria-label={`Edit ${row.full_name}`}
-          >
-            <Pencil className="h-4 w-4" strokeWidth={2} />
-          </Link>
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-lg p-2 text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-            aria-label={`Delete ${row.full_name}`}
-            onClick={() => onDelete(row.id)}
-          >
-            <Trash2 className="h-4 w-4" strokeWidth={2} />
-          </button>
-        </div>
+        <EmployeeRowActionsMenu
+          row={row}
+          onDelete={onDelete}
+          onToggleStatus={onToggleStatus}
+          statusUpdatingId={statusUpdatingId}
+        />
       ),
     },
   ];
@@ -270,12 +253,25 @@ export function EmployeesTable({
   rows,
   visibility,
   onDelete,
+  onEmployeeNameClick,
+  onToggleStatus,
+  statusUpdatingId,
 }: {
   rows: EmployeeListRow[];
   visibility: Record<EmployeeColumnId, boolean>;
   onDelete: (id: string) => void | Promise<void>;
+  onEmployeeNameClick?: (id: string) => void;
+  /** Toggle between Active and Deactive (database constraint). */
+  onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
+  /** When set, the status button for this row shows a spinner. */
+  statusUpdatingId?: string | null;
 }) {
-  const defs = buildColumnDefs(onDelete);
+  const defs = buildColumnDefs(
+    onDelete,
+    onEmployeeNameClick,
+    onToggleStatus,
+    statusUpdatingId,
+  );
   const filtered = defs.filter((d) => visibility[d.id] === true);
   const visible =
     filtered.length > 0
@@ -287,14 +283,16 @@ export function EmployeesTable({
   const thBase =
     "whitespace-nowrap px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400";
   const tdBase =
-    "px-4 py-3 align-middle text-slate-800 dark:text-slate-200";
+    "min-w-0 px-4 py-3 align-middle text-slate-800 dark:text-slate-200";
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-      <table
-        className="w-full min-w-[720px] border-collapse text-left text-sm"
-        style={{ minWidth: `${Math.max(720, colCount * 100)}px` }}
-      >
+    <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+      <table className="w-full table-fixed border-collapse text-left text-sm">
+        <colgroup>
+          {visible.map((col) => (
+            <col key={col.id} style={colWidthStyle(col.id)} />
+          ))}
+        </colgroup>
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
             {visible.map((col, i) => (
@@ -303,6 +301,7 @@ export function EmployeesTable({
                 scope="col"
                 className={[
                   thBase,
+                  col.thClass ?? "",
                   i === firstFamilyIdx && firstFamilyIdx >= 0
                     ? "border-l border-slate-200 dark:border-slate-700"
                     : "",

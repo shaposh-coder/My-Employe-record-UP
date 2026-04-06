@@ -12,6 +12,16 @@ export type SocialLinkKey = (typeof SOCIAL_LINK_KEYS)[number];
 
 export type SocialLinksRecord = Partial<Record<SocialLinkKey, string | null>>;
 
+/** Display names for UI (table popup, detail modal, etc.). */
+export const SOCIAL_PLATFORM_LABELS: Record<SocialLinkKey, string> = {
+  instagram: "Instagram",
+  facebook: "Facebook",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  snapchat: "Snapchat",
+  twitter: "X / Twitter",
+};
+
 export function normalizeSocialLinksForDb(input: {
   instagram?: string;
   facebook?: string;

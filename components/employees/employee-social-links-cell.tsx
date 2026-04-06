@@ -4,19 +4,11 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Share2, X } from "lucide-react";
 import {
   SOCIAL_LINK_KEYS,
+  SOCIAL_PLATFORM_LABELS,
   type SocialLinkKey,
   type SocialLinksRecord,
 } from "@/lib/social-links";
 import { SocialPlatformIcon } from "./social-platform-icons";
-
-const PLATFORM_LABELS: Record<SocialLinkKey, string> = {
-  instagram: "Instagram",
-  facebook: "Facebook",
-  tiktok: "TikTok",
-  youtube: "YouTube",
-  snapchat: "Snapchat",
-  twitter: "X / Twitter",
-};
 
 type LinkItem =
   | { kind: "platform"; key: SocialLinkKey; url: string }
@@ -144,7 +136,7 @@ export function EmployeeSocialLinksCell({
                         <>
                           <SocialPlatformIcon platform={item.key} />
                           <span className="max-w-[6rem] text-center text-xs font-medium text-slate-700 dark:text-slate-200">
-                            {PLATFORM_LABELS[item.key]}
+                            {SOCIAL_PLATFORM_LABELS[item.key]}
                           </span>
                         </>
                       ) : (
