@@ -5,6 +5,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Search,
   Trash2,
   User,
   X,
@@ -59,32 +61,8 @@ function employeeFieldValuesMatchingRow(row: DirectoryItem): string[] {
   return [...out];
 }
 
-/** How many employees use this department/section (normalized title match). */
-function countEmployeesForDirectoryRow(
-  row: DirectoryItem,
-  employeeValues: string[],
-): number {
-  const rowKey = formatTitleForStorage(row.title);
-  if (!rowKey) return 0;
-  return employeeValues.reduce(
-    (acc, v) => acc + (formatTitleForStorage(v) === rowKey ? 1 : 0),
-    0,
-  );
-}
-
-function isDirectoryRowUsedByEmployees(
-  row: DirectoryItem,
-  employeeValues: string[],
-): boolean {
-  return countEmployeesForDirectoryRow(row, employeeValues) > 0;
-}
-
-/** e.g. 5 → "(05)", 42 → "(42)", 150 → "(150)" */
-function formatEmployeeCountLabel(count: number): string {
-  const n = Math.max(0, Math.floor(Number.isFinite(count) ? count : 0));
-  const inner = n < 100 ? String(n).padStart(2, "0") : String(n);
-  return `(${inner})`;
-}
+const MODAL_FIELD_CLASS =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500 dark:focus:ring-slate-400/20";
 
 type EmployeeMiniRow = {
   id: string;
@@ -291,7 +269,6 @@ function ItemFormModal({
   titleId: string;
   initialItem: DirectoryItem | null;
   items: DirectoryItem[];
-  /** Row id to skip when checking duplicates (current row in edit mode). */
   excludeId: string | null;
   onClose: () => void;
   onSubmit: (item: { title: string; description: string }) => void | Promise<void>;
@@ -428,10 +405,10 @@ function ItemFormModal({
                 isDuplicateTitle ? `${baseId}-dup` : undefined
               }
               className={[
-                "w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500",
+                MODAL_FIELD_CLASS,
                 isDuplicateTitle
                   ? "border-amber-500 focus:border-amber-500 focus:ring-amber-500/25 dark:border-amber-500 dark:focus:border-amber-500 dark:focus:ring-amber-500/20"
-                  : "border-slate-200 focus:border-slate-400 focus:ring-slate-900/10 dark:border-slate-600 dark:focus:border-slate-500 dark:focus:ring-slate-400/20",
+                  : "",
               ].join(" ")}
             />
             {isDuplicateTitle ? (
@@ -467,7 +444,7 @@ function ItemFormModal({
               rows={3}
               disabled={saving}
               placeholder="Optional details"
-              className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500 dark:focus:ring-slate-400/20"
+              className={`${MODAL_FIELD_CLASS} resize-y`}
             />
           </div>
           <div className="mt-1 flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -506,59 +483,97 @@ function ItemFormModal({
 }
 
 function DirectoryPanel({
+  kind,
   title,
   items,
+  counts,
   onAdd,
   onUpdate,
   onDelete,
-  isDeleteDisabled,
-  employeeCount,
   onShowEmployees,
 }: {
+  kind: "department" | "section";
   title: string;
   items: DirectoryItem[];
+  /** Employee counts keyed by directory row id. */
+  counts: Record<string, number>;
   onAdd: (item: { title: string; description: string }) => void | Promise<void>;
   onUpdate: (
     id: string,
     item: { title: string; description: string },
   ) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
-  /** When true, delete control is disabled (e.g. row still referenced by employees). */
-  isDeleteDisabled?: (item: DirectoryItem) => boolean;
-  /** Employees assigned to this row (for title suffix like "Studio (05)"). */
-  employeeCount: (item: DirectoryItem) => number;
-  /** Opens popup listing employees for this department or section. */
   onShowEmployees: (item: DirectoryItem) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [editState, setEditState] = useState<{
     id: string;
     item: DirectoryItem;
   } | null>(null);
-  const addTitleId = useId();
+  const addModalTitleId = useId();
   const editTitleId = useId();
 
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((it) => {
+      const t = it.title.toLowerCase();
+      const d = (it.description ?? "").toLowerCase();
+      return t.includes(q) || d.includes(q);
+    });
+  }, [items, searchQuery]);
+
   return (
-    <section className="flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-      <div className="flex flex-row items-center justify-between gap-4 border-b border-slate-100 px-6 py-5 dark:border-slate-800">
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+    <section className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           {title}
         </h2>
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
           Add
         </button>
       </div>
 
+      <div
+        className="border-b border-slate-100 p-3 dark:border-slate-800"
+        role="search"
+      >
+        <label htmlFor={`search-${kind}-${title}`} className="sr-only">
+          {kind === "department"
+            ? "Search departments"
+            : "Search sections"}
+        </label>
+        <div className="flex h-11 min-w-0 items-stretch overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm ring-slate-200/60 transition focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-200/70 dark:border-slate-600 dark:bg-slate-800/80 dark:ring-slate-700/40 dark:focus-within:border-slate-500 dark:focus-within:ring-slate-600/35">
+          <div className="relative flex min-w-0 flex-1 items-center">
+            <Search
+              className="pointer-events-none absolute left-3 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
+              strokeWidth={2}
+              aria-hidden
+            />
+            <input
+              id={`search-${kind}-${title}`}
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name or description…"
+              autoComplete="off"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent py-2 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+          </div>
+        </div>
+      </div>
+
       <ItemFormModal
         open={addOpen}
         mode="add"
         panelLabel={title}
-        titleId={addTitleId}
+        titleId={addModalTitleId}
         initialItem={null}
         items={items}
         excludeId={null}
@@ -581,25 +596,25 @@ function DirectoryPanel({
         }}
       />
 
-      <div className="overflow-x-auto px-1 pb-1">
-        <table className="w-full min-w-[320px] border-collapse text-left text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[min(100%,28rem)] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-100 dark:border-slate-800">
+            <tr className="border-b border-slate-100 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
               <th
                 scope="col"
-                className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                className="whitespace-nowrap px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
               >
-                Title
+                Name
               </th>
               <th
                 scope="col"
-                className="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                className="min-w-[6rem] px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
               >
                 Description
               </th>
               <th
                 scope="col"
-                className="w-[1%] whitespace-nowrap px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                className="w-[1%] whitespace-nowrap px-3 py-2.5 text-right text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
               >
                 Action
               </th>
@@ -610,83 +625,99 @@ function DirectoryPanel({
               <tr>
                 <td
                   colSpan={3}
-                  className="px-6 py-8 text-center text-sm text-slate-400 dark:text-slate-500"
+                  className="px-3 py-6 text-center text-sm font-medium text-slate-500 dark:text-slate-400"
                 >
-                  No items yet. Use Add to create one.
+                  No rows yet — click Add to create one.
+                </td>
+              </tr>
+            ) : filteredItems.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={3}
+                  className="px-3 py-6 text-center text-sm font-medium text-slate-500 dark:text-slate-400"
+                >
+                  No matches for your search.
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
-                <tr
-                  key={item.id}
-                  className="border-b border-slate-50 last:border-0 dark:border-slate-800/80"
-                >
-                  <td className="px-6 py-3 text-slate-800 dark:text-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => onShowEmployees(item)}
-                      className="group inline-flex max-w-full flex-wrap items-baseline gap-x-0 text-left transition"
-                    >
-                      <span className="font-medium text-slate-800 underline-offset-2 group-hover:underline dark:text-slate-200">
-                        {item.title}
-                      </span>
-                      <span
-                        className="ml-1.5 font-normal tabular-nums text-slate-500 group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-300"
-                        title="Click to see employees"
-                      >
-                        {formatEmployeeCountLabel(employeeCount(item))}
-                      </span>
-                    </button>
-                  </td>
-                  <td className="max-w-[min(12rem,40vw)] px-6 py-3 text-slate-600 dark:text-slate-400">
-                    {item.description ? (
-                      <span className="line-clamp-2">{item.description}</span>
-                    ) : (
-                      <span className="text-slate-400 dark:text-slate-500">—</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-6 py-2 text-right">
-                    <div className="inline-flex items-center justify-end gap-1">
+              filteredItems.map((item) => {
+                const n = counts[item.id] ?? 0;
+                const deleteBlocked = n > 0;
+                return (
+                  <tr
+                    key={item.id}
+                    className="border-b border-slate-50 text-sm font-semibold last:border-0 dark:border-slate-800/80"
+                  >
+                    <td className="max-w-[min(16rem,50vw)] px-3 py-2 align-middle">
                       <button
                         type="button"
-                        onClick={() =>
-                          setEditState({ id: item.id, item })
-                        }
-                        className="rounded-lg p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                        aria-label={`Edit ${item.title}`}
+                        onClick={() => onShowEmployees(item)}
+                        className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
+                        title="View employees assigned to this row"
                       >
-                        <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                        <span className="font-bold text-slate-900 underline-offset-2 group-hover:underline dark:text-slate-100">
+                          {item.title}
+                        </span>
+                        <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
+                          ({n})
+                        </span>
                       </button>
-                      <button
-                        type="button"
-                        disabled={isDeleteDisabled?.(item) === true}
-                        title={
-                          isDeleteDisabled?.(item)
-                            ? "In use by at least one employee — cannot delete"
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (isDeleteDisabled?.(item)) return;
-                          const ok = window.confirm(
-                            `Delete “${item.title}”? This cannot be undone.`,
-                          );
-                          if (ok) void onDelete(item.id);
-                        }}
-                        className={[
-                          "rounded-lg p-2 transition",
-                          isDeleteDisabled?.(item)
-                            ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
-                            : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
-                        ].join(" ")}
-                        aria-label={`Delete ${item.title}`}
-                        aria-disabled={isDeleteDisabled?.(item) === true}
-                      >
-                        <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="max-w-[min(14rem,35vw)] px-3 py-2 align-middle font-medium text-slate-700 dark:text-slate-300">
+                      {item.description ? (
+                        <span className="line-clamp-2 font-semibold">
+                          {item.description}
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-slate-400 dark:text-slate-500">
+                          —
+                        </span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
+                      <div className="inline-flex items-center justify-end gap-0.5">
+                        <button
+                          type="button"
+                          disabled={deleteBlocked}
+                          title={
+                            deleteBlocked
+                              ? `${n} employee(s) assigned — remove assignments first`
+                              : "Delete"
+                          }
+                          onClick={() => {
+                            if (deleteBlocked) return;
+                            const ok = window.confirm(
+                              `Delete “${item.title}”? This cannot be undone.`,
+                            );
+                            if (ok) void onDelete(item.id);
+                          }}
+                          className={[
+                            "rounded-md p-1.5 transition",
+                            deleteBlocked
+                              ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
+                              : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
+                          ].join(" ")}
+                          aria-label={`Delete ${item.title}`}
+                          aria-disabled={deleteBlocked}
+                        >
+                          <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditState({ id: item.id, item })
+                          }
+                          className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                          aria-label={`Edit ${item.title}`}
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -695,15 +726,55 @@ function DirectoryPanel({
   );
 }
 
+type DeptCountRow = { dept_id: string; employee_count: number | string };
+type SecCountRow = { section_id: string; employee_count: number | string };
+
+function mapCount<T extends Record<string, unknown>>(
+  rows: T[] | null,
+  idKey: string,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows ?? []) {
+    const id = r[idKey];
+    const c = r.employee_count;
+    if (typeof id === "string") {
+      const n = typeof c === "number" ? c : Number(c);
+      out[id] = Number.isFinite(n) ? n : 0;
+    }
+  }
+  return out;
+}
+
+function buildFallbackCounts(
+  deptRows: DirectoryItem[],
+  secRows: DirectoryItem[],
+  emps: { department: string | null; section: string | null }[],
+): { dept: Record<string, number>; sec: Record<string, number> } {
+  const deptOut: Record<string, number> = {};
+  const secOut: Record<string, number> = {};
+  for (const row of deptRows) {
+    const key = formatTitleForStorage(row.title);
+    deptOut[row.id] = emps.filter(
+      (e) =>
+        e.department != null &&
+        formatTitleForStorage(e.department) === key,
+    ).length;
+  }
+  for (const row of secRows) {
+    const key = formatTitleForStorage(row.title);
+    secOut[row.id] = emps.filter(
+      (e) =>
+        e.section != null && formatTitleForStorage(e.section) === key,
+    ).length;
+  }
+  return { dept: deptOut, sec: secOut };
+}
+
 export function DepartmentSectionSettings() {
   const [departments, setDepartments] = useState<DirectoryItem[]>([]);
   const [sections, setSections] = useState<DirectoryItem[]>([]);
-  const [employeeDepartmentValues, setEmployeeDepartmentValues] = useState<
-    string[]
-  >([]);
-  const [employeeSectionValues, setEmployeeSectionValues] = useState<string[]>(
-    [],
-  );
+  const [deptCounts, setDeptCounts] = useState<Record<string, number>>({});
+  const [secCounts, setSecCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [employeeListModal, setEmployeeListModal] = useState<{
@@ -712,62 +783,123 @@ export function DepartmentSectionSettings() {
   } | null>(null);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
 
-  const refreshEmployeeUsage = useCallback(async () => {
+  const employeeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  const loadDirectorySnapshot = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    setLoadError(null);
+
+    const [dRes, sRes] = await Promise.all([
+      supabase.from("departments").select("*").order("title"),
+      supabase.from("sections").select("*").order("title"),
+    ]);
+
+    if (dRes.error) {
+      setLoadError(dRes.error.message);
+      return;
+    }
+    if (sRes.error) {
+      setLoadError(sRes.error.message);
+      return;
+    }
+
+    const deptRows = ((dRes.data as DirectoryItem[]) ?? [])
+      .slice()
+      .sort(sortByTitle);
+    const secRows = ((sRes.data as DirectoryItem[]) ?? [])
+      .slice()
+      .sort(sortByTitle);
+    setDepartments(deptRows);
+    setSections(secRows);
+
+    const [dcRes, scRes] = await Promise.all([
+      supabase.rpc("department_employee_counts"),
+      supabase.rpc("section_employee_counts"),
+    ]);
+
+    if (!dcRes.error && dcRes.data != null && !scRes.error && scRes.data != null) {
+      setDeptCounts(mapCount(dcRes.data as DeptCountRow[], "dept_id"));
+      setSecCounts(mapCount(scRes.data as SecCountRow[], "section_id"));
+      return;
+    }
+
+    const { data: emps, error: empErr } = await supabase
       .from("employees")
       .select("department, section");
-    const dept: string[] = [];
-    const sec: string[] = [];
-    for (const r of data ?? []) {
-      if (
-        typeof r.department === "string" &&
-        r.department.trim() !== ""
-      ) {
-        dept.push(r.department);
-      }
-      if (typeof r.section === "string" && r.section.trim() !== "") {
-        sec.push(r.section);
-      }
+    if (empErr) {
+      setDeptCounts({});
+      setSecCounts({});
+      return;
     }
-    setEmployeeDepartmentValues(dept);
-    setEmployeeSectionValues(sec);
+    const list = (emps ?? []) as {
+      department: string | null;
+      section: string | null;
+    }[];
+    const { dept, sec } = buildFallbackCounts(deptRows, secRows, list);
+    setDeptCounts(dept);
+    setSecCounts(sec);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    const supabase = createClient();
-
-    async function load() {
+    async function boot() {
       setLoading(true);
       setLoadError(null);
-      const [dRes, sRes] = await Promise.all([
-        supabase.from("departments").select("*").order("title"),
-        supabase.from("sections").select("*").order("title"),
-      ]);
-      if (cancelled) return;
-      if (dRes.error) {
-        setLoadError(dRes.error.message);
-        setLoading(false);
-        return;
-      }
-      if (sRes.error) {
-        setLoadError(sRes.error.message);
-        setLoading(false);
-        return;
-      }
-      setDepartments((dRes.data as DirectoryItem[]) ?? []);
-      setSections((sRes.data as DirectoryItem[]) ?? []);
-      await refreshEmployeeUsage();
-      if (cancelled) return;
-      setLoading(false);
+      await loadDirectorySnapshot();
+      if (!cancelled) setLoading(false);
     }
-
-    void load();
+    void boot();
     return () => {
       cancelled = true;
     };
-  }, [refreshEmployeeUsage]);
+  }, [loadDirectorySnapshot]);
+
+  const scheduleEmployeeRefresh = useCallback(() => {
+    if (employeeDebounceRef.current) {
+      clearTimeout(employeeDebounceRef.current);
+    }
+    employeeDebounceRef.current = setTimeout(() => {
+      employeeDebounceRef.current = null;
+      void loadDirectorySnapshot();
+    }, 400);
+  }, [loadDirectorySnapshot]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("configuration-directory")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "departments" },
+        () => {
+          void loadDirectorySnapshot();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "sections" },
+        () => {
+          void loadDirectorySnapshot();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "employees" },
+        () => {
+          scheduleEmployeeRefresh();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (employeeDebounceRef.current) {
+        clearTimeout(employeeDebounceRef.current);
+      }
+      supabase.removeChannel(channel);
+    };
+  }, [loadDirectorySnapshot, scheduleEmployeeRefresh]);
 
   async function addDepartment(item: { title: string; description: string }) {
     const supabase = createClient();
@@ -790,7 +922,10 @@ export function DepartmentSectionSettings() {
       }
       throw error;
     }
-    setDepartments((prev) => [...prev, data as DirectoryItem].sort(sortByTitle));
+    setDepartments((prev) =>
+      [...prev, data as DirectoryItem].sort(sortByTitle),
+    );
+    void loadDirectorySnapshot();
   }
 
   async function addSection(item: { title: string; description: string }) {
@@ -814,7 +949,10 @@ export function DepartmentSectionSettings() {
       }
       throw error;
     }
-    setSections((prev) => [...prev, data as DirectoryItem].sort(sortByTitle));
+    setSections((prev) =>
+      [...prev, data as DirectoryItem].sort(sortByTitle),
+    );
+    void loadDirectorySnapshot();
   }
 
   async function updateDepartment(
@@ -849,7 +987,7 @@ export function DepartmentSectionSettings() {
         .map((row) => (row.id === id ? (data as DirectoryItem) : row))
         .sort(sortByTitle),
     );
-    void refreshEmployeeUsage();
+    void loadDirectorySnapshot();
   }
 
   async function updateSection(
@@ -882,87 +1020,49 @@ export function DepartmentSectionSettings() {
         .map((row) => (row.id === id ? (data as DirectoryItem) : row))
         .sort(sortByTitle),
     );
-    void refreshEmployeeUsage();
+    void loadDirectorySnapshot();
   }
 
   async function deleteDepartment(id: string) {
     const row = departments.find((d) => d.id === id);
     if (!row) return;
-
-    const candidates = employeeFieldValuesMatchingRow(row);
-    if (candidates.length === 0) {
-      toast.error("Could not delete department", {
-        description: "Invalid department title.",
-      });
+    const n = deptCounts[row.id] ?? 0;
+    if (n > 0) {
+      toast.error(
+        `Cannot delete. This department is currently assigned to ${n} employees.`,
+      );
       return;
     }
 
     const supabase = createClient();
-    const { data: inUseRows, error: useError } = await supabase
-      .from("employees")
-      .select("id")
-      .in("department", candidates)
-      .limit(1);
-
-    if (useError) {
-      toast.error("Could not verify usage", { description: useError.message });
-      return;
-    }
-    if (inUseRows && inUseRows.length > 0) {
-      const label = formatTitleForStorage(row.title);
-      toast.error("Cannot delete department", {
-        description: `At least one employee still has department “${label}”. Update those employees first, then try again.`,
-      });
-      return;
-    }
-
     const { error } = await supabase.from("departments").delete().eq("id", id);
     if (error) {
       toast.error("Could not delete department", { description: error.message });
       throw error;
     }
     setDepartments((prev) => prev.filter((r) => r.id !== id));
-    void refreshEmployeeUsage();
+    void loadDirectorySnapshot();
   }
 
   async function deleteSection(id: string) {
     const row = sections.find((s) => s.id === id);
     if (!row) return;
-
-    const candidates = employeeFieldValuesMatchingRow(row);
-    if (candidates.length === 0) {
-      toast.error("Could not delete section", {
-        description: "Invalid section title.",
-      });
+    const n = secCounts[row.id] ?? 0;
+    if (n > 0) {
+      toast.error(
+        `Cannot delete. This section is currently assigned to ${n} employees.`,
+      );
       return;
     }
 
     const supabase = createClient();
-    const { data: inUseRows, error: useError } = await supabase
-      .from("employees")
-      .select("id")
-      .in("section", candidates)
-      .limit(1);
-
-    if (useError) {
-      toast.error("Could not verify usage", { description: useError.message });
-      return;
-    }
-    if (inUseRows && inUseRows.length > 0) {
-      const label = formatTitleForStorage(row.title);
-      toast.error("Cannot delete section", {
-        description: `At least one employee still has section “${label}”. Update those employees first, then try again.`,
-      });
-      return;
-    }
-
     const { error } = await supabase.from("sections").delete().eq("id", id);
     if (error) {
       toast.error("Could not delete section", { description: error.message });
       throw error;
     }
     setSections((prev) => prev.filter((r) => r.id !== id));
-    void refreshEmployeeUsage();
+    void loadDirectorySnapshot();
   }
 
   if (loading) {
@@ -1010,35 +1110,27 @@ export function DepartmentSectionSettings() {
         item={employeeListModal?.item ?? null}
         onViewEmployee={(id) => setDetailEmployeeId(id)}
       />
-      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <DirectoryPanel
+          kind="department"
           title="Departments"
           items={departments}
+          counts={deptCounts}
           onAdd={addDepartment}
           onUpdate={updateDepartment}
           onDelete={deleteDepartment}
-          employeeCount={(item) =>
-            countEmployeesForDirectoryRow(item, employeeDepartmentValues)
-          }
-          isDeleteDisabled={(item) =>
-            isDirectoryRowUsedByEmployees(item, employeeDepartmentValues)
-          }
           onShowEmployees={(item) =>
             setEmployeeListModal({ field: "department", item })
           }
         />
         <DirectoryPanel
+          kind="section"
           title="Sections"
           items={sections}
+          counts={secCounts}
           onAdd={addSection}
           onUpdate={updateSection}
           onDelete={deleteSection}
-          employeeCount={(item) =>
-            countEmployeesForDirectoryRow(item, employeeSectionValues)
-          }
-          isDeleteDisabled={(item) =>
-            isDirectoryRowUsedByEmployees(item, employeeSectionValues)
-          }
           onShowEmployees={(item) =>
             setEmployeeListModal({ field: "section", item })
           }

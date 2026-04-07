@@ -19,6 +19,7 @@ import { EmployeeDetailModal } from "@/components/employees/employee-detail-moda
 import type { EmployeeListRow } from "@/components/employees/employee-list-row";
 import { EmployeesFilterBar } from "@/components/employees/employees-filter-bar";
 import { EmployeesPagination } from "@/components/employees/employees-pagination";
+import { EmployeesTableSkeleton } from "@/components/employees/employees-table-skeleton";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { fetchEmployeeFilterOptions } from "@/lib/fetch-employee-filter-options";
 import { createClient } from "@/lib/supabase/client";
@@ -26,7 +27,7 @@ import {
   DEFAULT_EMPLOYEES_PAGE_SIZE,
   EMPLOYEES_PAGE_SIZE_OPTIONS,
   type EmployeesPageSize,
-  fetchEmployeesForTable,
+  fetchEmployees,
 } from "@/lib/fetch-employees";
 
 export default function EmployeesPage() {
@@ -68,6 +69,12 @@ export default function EmployeesPage() {
     setPage(1);
   }, [debouncedSearch]);
 
+  /** If the result set shrinks (filters, deletes), avoid staying past the last page. */
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(totalCount / pageSize) || 1);
+    if (page > maxPage) setPage(maxPage);
+  }, [totalCount, pageSize, page]);
+
   const filterCriteria = useMemo(
     () => ({
       search: debouncedSearch.trim() || undefined,
@@ -108,7 +115,7 @@ export default function EmployeesPage() {
   }, []);
 
   const loadRows = useCallback(async () => {
-    const { rows: next, total, error } = await fetchEmployeesForTable({
+    const { rows: next, total, error } = await fetchEmployees({
       page,
       pageSize,
       ...filterCriteria,
@@ -327,17 +334,21 @@ export default function EmployeesPage() {
       ) : null}
 
       {!ready ? (
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500 dark:border-slate-700/80 dark:bg-slate-900 dark:text-slate-400">
-          Loading…
-        </div>
+        <EmployeesTableSkeleton
+          visibility={visibility}
+          rowCount={pageSize}
+          embedInCard={false}
+        />
       ) : (
-        <div
-          className={
-            listLoading ? "pointer-events-none opacity-60 transition-opacity" : ""
-          }
-        >
-          <div className="flex max-h-[min(75vh,calc(100vh-12rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex max-h-[min(75vh,calc(100vh-12rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+          <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+            {listLoading ? (
+              <EmployeesTableSkeleton
+                visibility={visibility}
+                rowCount={pageSize}
+                embedInCard
+              />
+            ) : (
               <EmployeesTable
                 embedInCard
                 rows={displayRows}
@@ -347,17 +358,17 @@ export default function EmployeesPage() {
                 onToggleStatus={handleToggleStatus}
                 statusUpdatingId={statusUpdatingId}
               />
-            </div>
-            <EmployeesPagination
-              page={page}
-              pageSize={pageSize}
-              pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
-              total={totalCount}
-              disabled={listLoading}
-              onPageChange={setPage}
-              onPageSizeChange={handlePageSizeChange}
-            />
+            )}
           </div>
+          <EmployeesPagination
+            page={page}
+            pageSize={pageSize}
+            pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
+            total={totalCount}
+            disabled={listLoading}
+            onPageChange={setPage}
+            onPageSizeChange={handlePageSizeChange}
+          />
         </div>
       )}
 

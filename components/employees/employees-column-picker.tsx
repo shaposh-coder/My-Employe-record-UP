@@ -5,6 +5,7 @@ import { Columns3 } from "lucide-react";
 import {
   EMPLOYEE_COLUMN_IDS,
   EMPLOYEE_COLUMN_LABELS,
+  defaultColumnVisibility,
   ensureFixedColumnVisibility,
   isFixedEmployeeColumn,
   type EmployeeColumnId,
@@ -101,9 +102,13 @@ export function EmployeesColumnPicker({
 }
 
 export function useEmployeesColumnVisibility() {
-  const [visibility, setVisibilityState] = useState(() =>
-    loadColumnVisibility(),
-  );
+  /** Same on server + first client paint — avoids hydration mismatch (localStorage only after mount). */
+  const [visibility, setVisibilityState] = useState(defaultColumnVisibility);
+
+  useEffect(() => {
+    setVisibilityState(loadColumnVisibility());
+  }, []);
+
   const setVisibility = useCallback(
     (next: Record<EmployeeColumnId, boolean>) => {
       setVisibilityState(ensureFixedColumnVisibility(next));

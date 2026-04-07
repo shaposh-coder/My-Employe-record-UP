@@ -79,7 +79,7 @@ function EmployeesFilterBarInner({
               type="search"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search by name, phone, or city…"
+              placeholder="Search name, phone, CNIC, city, department, section…"
               autoComplete="off"
               className="h-full min-w-0 flex-1 border-0 bg-transparent py-2 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
             />

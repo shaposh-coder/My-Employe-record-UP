@@ -14,9 +14,10 @@ export type EmployeesPageSize = (typeof EMPLOYEES_PAGE_SIZE_OPTIONS)[number];
 export const DEFAULT_EMPLOYEES_PAGE_SIZE: EmployeesPageSize = 50;
 
 export type FetchEmployeesOptions = {
+  /** 1-based page index. */
   page?: number;
   pageSize?: number;
-  /** Trims; matches name, phone, or city (ilike). */
+  /** Trims; server-side `ilike` on name, phone, CNIC, city, department, section. */
   search?: string;
   department?: string;
   section?: string;
@@ -25,11 +26,37 @@ export type FetchEmployeesOptions = {
 
 /** Strip characters that break PostgREST `or()` filter strings. */
 function sanitizeSearchToken(raw: string): string {
-  return raw.replace(/,/g, " ").trim();
+  return raw
+    .replace(/,/g, " ")
+    .replace(/%/g, "")
+    .replace(/_/g, "")
+    .trim()
+    .slice(0, 200);
 }
 
-/** Load employees for the directory table (newest first), with optional pagination. */
-export async function fetchEmployeesForTable(
+/**
+ * Builds PostgREST `or=(...)` clause for cross-column ILIKE search (server-side only).
+ * Uses the same pattern for each column so `%` wildcards stay in the value.
+ */
+function buildSearchOrFilter(token: string): string | null {
+  if (!token) return null;
+  const pattern = `%${token}%`;
+  const cols = [
+    "full_name",
+    "phone_no",
+    "cnic_no",
+    "city",
+    "department",
+    "section",
+  ] as const;
+  return cols.map((col) => `${col}.ilike.${pattern}`).join(",");
+}
+
+/**
+ * Loads one page of employees for the directory table (newest first), with server-side
+ * filters, search (`ilike`), and Supabase `.range(from, to)` — never fetches the full table.
+ */
+export async function fetchEmployees(
   options?: FetchEmployeesOptions,
 ): Promise<{
   rows: EmployeeListRow[];
@@ -50,15 +77,12 @@ export async function fetchEmployeesForTable(
 
     const searchRaw = options?.search?.trim();
     if (searchRaw) {
-      const token = sanitizeSearchToken(searchRaw)
-        .replace(/%/g, "")
-        .replace(/_/g, "")
-        .slice(0, 200);
+      const token = sanitizeSearchToken(searchRaw);
       if (token.length > 0) {
-        const p = `%${token}%`;
-        query = query.or(
-          `full_name.ilike.${p},phone_no.ilike.${p},city.ilike.${p}`,
-        );
+        const orClause = buildSearchOrFilter(token);
+        if (orClause) {
+          query = query.or(orClause);
+        }
       }
     }
 
@@ -90,3 +114,6 @@ export async function fetchEmployeesForTable(
     };
   }
 }
+
+/** @deprecated Use `fetchEmployees` — alias kept for existing imports. */
+export const fetchEmployeesForTable = fetchEmployees;
