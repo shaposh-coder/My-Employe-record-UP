@@ -17,6 +17,17 @@ import { SearchableCombobox } from "./searchable-combobox";
 import { SocialPlatformIcon } from "./social-platform-icons";
 import { normalizeSocialLinksForDb } from "@/lib/social-links";
 import type { SocialLinkKey } from "@/lib/social-links";
+import {
+  CNIC_FORMAT_REGEX,
+  formatCnicInput,
+  formatPhoneInput,
+  normalizeCnicFromDb,
+  normalizePhoneFromDb,
+} from "@/lib/format-cnic-phone";
+import {
+  DUPLICATE_MSG,
+  isEmployeeCnicTaken,
+} from "@/lib/check-cnic-duplicate";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -45,7 +56,6 @@ const defaultValues: AddEmployeeFormValues = {
   social_twitter: "",
   email_address: "",
   reference_info: "",
-  family_father_name: "",
   family_cnic: "",
   family_phone: "",
   family_phone_alt: "",
@@ -155,6 +165,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
     watch,
     setError,
     clearErrors,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<AddEmployeeFormValues>({
     resolver: zodResolver(addEmployeeSchema),
@@ -163,10 +174,19 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
 
   const values = watch();
   const fatherName = watch("father_name");
+  const cnicNo = watch("cnic_no");
+
+  const [cnicDuplicateBlocked, setCnicDuplicateBlocked] = useState(false);
+  const [cnicLookupPending, setCnicLookupPending] = useState(false);
+  const cnicDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cnicCheckSeqRef = useRef(0);
 
   const canSave = useMemo(
-    () => addEmployeeSchema.safeParse(values).success,
-    [values],
+    () =>
+      addEmployeeSchema.safeParse(values).success &&
+      !cnicDuplicateBlocked &&
+      !cnicLookupPending,
+    [values, cnicDuplicateBlocked, cnicLookupPending],
   );
 
   function handleCloseForm() {
@@ -174,16 +194,50 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   }
 
   useEffect(() => {
-    setValue("family_father_name", fatherName ?? "", {
-      shouldValidate: true,
-      shouldDirty: false,
-    });
-  }, [fatherName, setValue]);
-
-  useEffect(() => {
     const el = tabScrollRef.current;
     if (el) el.scrollTop = 0;
   }, [activeTab]);
+
+  /** Live CNIC duplicate check when format is complete (debounced). */
+  useEffect(() => {
+    if (cnicDebounceRef.current) {
+      clearTimeout(cnicDebounceRef.current);
+      cnicDebounceRef.current = null;
+    }
+    const trimmed = (cnicNo ?? "").trim();
+    if (!CNIC_FORMAT_REGEX.test(trimmed)) {
+      setCnicDuplicateBlocked(false);
+      setCnicLookupPending(false);
+      void trigger("cnic_no");
+      return;
+    }
+    setCnicLookupPending(true);
+    const seq = ++cnicCheckSeqRef.current;
+    cnicDebounceRef.current = setTimeout(async () => {
+      const supabase = createClient();
+      const taken = await isEmployeeCnicTaken(
+        supabase,
+        trimmed,
+        editEmployeeId ?? null,
+      );
+      if (seq !== cnicCheckSeqRef.current) return;
+      setCnicLookupPending(false);
+      if (taken) {
+        setCnicDuplicateBlocked(true);
+        setError("cnic_no", { type: "validate", message: DUPLICATE_MSG });
+      } else {
+        setCnicDuplicateBlocked(false);
+        clearErrors("cnic_no");
+        void trigger("cnic_no");
+      }
+    }, 450);
+    return () => {
+      if (cnicDebounceRef.current) {
+        clearTimeout(cnicDebounceRef.current);
+        cnicDebounceRef.current = null;
+      }
+    };
+  }, [cnicNo, editEmployeeId, setError, clearErrors, trigger]);
 
   useEffect(() => {
     const id = editEmployeeId;
@@ -214,11 +268,15 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       reset({
         full_name: String(d.full_name ?? ""),
         status: d.status === "Deactive" ? "Deactive" : "Active",
-        father_name: String(d.father_name ?? ""),
+        father_name: (() => {
+          const a = String(d.father_name ?? "").trim();
+          const b = String(d.family_father_name ?? "").trim();
+          return a || b;
+        })(),
         dob: String(d.dob ?? ""),
-        cnic_no: String(d.cnic_no ?? ""),
+        cnic_no: normalizeCnicFromDb(String(d.cnic_no ?? "")),
         ss_eubi_no: String(d.ss_eubi_no ?? ""),
-        phone_no: String(d.phone_no ?? ""),
+        phone_no: normalizePhoneFromDb(String(d.phone_no ?? "")),
         city: String(d.city ?? ""),
         address: String(d.address ?? ""),
         department: String(d.department ?? ""),
@@ -233,10 +291,9 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
         social_twitter: String(sl.twitter ?? ""),
         email_address: String(d.email_address ?? ""),
         reference_info: String(d.reference_info ?? ""),
-        family_father_name: String(d.family_father_name ?? ""),
-        family_cnic: String(d.family_cnic ?? ""),
-        family_phone: String(d.family_phone ?? ""),
-        family_phone_alt: String(d.family_phone_alt ?? ""),
+        family_cnic: normalizeCnicFromDb(String(d.family_cnic ?? "")),
+        family_phone: normalizePhoneFromDb(String(d.family_phone ?? "")),
+        family_phone_alt: normalizePhoneFromDb(String(d.family_phone_alt ?? "")),
         profile_image: String(d.profile_image ?? ""),
         cnic_front: String(d.cnic_front ?? ""),
         cnic_back: String(d.cnic_back ?? ""),
@@ -330,6 +387,19 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       twitter: data.social_twitter,
     });
 
+    const cnicDuplicate = await isEmployeeCnicTaken(
+      supabase,
+      data.cnic_no,
+      editEmployeeId ?? null,
+    );
+    if (cnicDuplicate) {
+      setSubmitError(DUPLICATE_MSG);
+      setError("cnic_no", { message: DUPLICATE_MSG });
+      toast.error("Could not save employee", { description: DUPLICATE_MSG });
+      setActiveTab("personal");
+      return;
+    }
+
     const payload = {
       full_name: data.full_name,
       father_name: data.father_name || null,
@@ -349,7 +419,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       email_address: data.email_address || null,
       reference_info: data.reference_info || null,
       family_name: null,
-      family_father_name: data.family_father_name || null,
+      family_father_name: data.father_name || null,
       family_cnic: data.family_cnic || null,
       family_phone: data.family_phone || null,
       family_phone_alt: data.family_phone_alt || null,
@@ -582,13 +652,34 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                     CNIC / national ID
                     <ReqStar />
                   </label>
-                  <input
-                    id="cnic_no"
-                    type="text"
-                    autoComplete="off"
-                    className={inputClass}
-                    {...register("cnic_no")}
+                  <Controller
+                    name="cnic_no"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        id="cnic_no"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="33203-1234567-5"
+                        maxLength={15}
+                        className={inputClass}
+                        aria-invalid={Boolean(errors.cnic_no)}
+                        aria-busy={cnicLookupPending}
+                        value={field.value}
+                        onChange={(e) =>
+                          field.onChange(formatCnicInput(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
+                  {cnicLookupPending &&
+                  CNIC_FORMAT_REGEX.test((cnicNo ?? "").trim()) ? (
+                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                      Checking CNIC…
+                    </p>
+                  ) : null}
                   {errors.cnic_no ? (
                     <p className={errorClass} role="alert">
                       {errors.cnic_no.message}
@@ -611,12 +702,26 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                     Phone number
                     <ReqStar />
                   </label>
-                  <input
-                    id="phone_no"
-                    type="tel"
-                    autoComplete="tel"
-                    className={inputClass}
-                    {...register("phone_no")}
+                  <Controller
+                    name="phone_no"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        id="phone_no"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="0305-1234567"
+                        maxLength={12}
+                        className={inputClass}
+                        aria-invalid={Boolean(errors.phone_no)}
+                        value={field.value}
+                        onChange={(e) =>
+                          field.onChange(formatPhoneInput(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
                   {errors.phone_no ? (
                     <p className={errorClass} role="alert">
@@ -851,19 +956,22 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                   <input
                     id="family_father_name"
                     type="text"
-                    readOnly
-                    aria-readonly="true"
+                    autoComplete="name"
                     aria-required="true"
-                    title="Synced from Personal → Father’s name"
-                    className={`${inputClass} cursor-default bg-slate-50 text-slate-700 dark:bg-slate-900/70 dark:text-slate-200`}
-                    {...register("family_father_name")}
+                    title="Linked with Personal → Father’s name"
+                    className={inputClass}
+                    value={fatherName}
+                    onChange={(e) =>
+                      setValue("father_name", e.target.value, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                    onBlur={() => void trigger("father_name")}
                   />
-                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                    Same as Personal → Father’s name
-                  </p>
-                  {errors.family_father_name ? (
+                  {errors.father_name ? (
                     <p className={errorClass} role="alert">
-                      {errors.family_father_name.message}
+                      {errors.father_name.message}
                     </p>
                   ) : null}
                 </div>
@@ -871,26 +979,59 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                   <label htmlFor="family_cnic" className={labelClass}>
                     Father CNIC
                   </label>
-                  <input
-                    id="family_cnic"
-                    type="text"
-                    autoComplete="off"
-                    className={inputClass}
-                    {...register("family_cnic")}
+                  <Controller
+                    name="family_cnic"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        id="family_cnic"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="33203-1234567-5"
+                        maxLength={15}
+                        className={inputClass}
+                        aria-invalid={Boolean(errors.family_cnic)}
+                        value={field.value}
+                        onChange={(e) =>
+                          field.onChange(formatCnicInput(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
+                  {errors.family_cnic ? (
+                    <p className={errorClass} role="alert">
+                      {errors.family_cnic.message}
+                    </p>
+                  ) : null}
                 </div>
                 <div>
                   <label htmlFor="family_phone" className={labelClass}>
                     Father phone (main)
                     <ReqStar />
                   </label>
-                  <input
-                    id="family_phone"
-                    type="tel"
-                    autoComplete="tel"
-                    aria-required="true"
-                    className={inputClass}
-                    {...register("family_phone")}
+                  <Controller
+                    name="family_phone"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        id="family_phone"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        aria-required="true"
+                        placeholder="0305-1234567"
+                        maxLength={12}
+                        className={inputClass}
+                        aria-invalid={Boolean(errors.family_phone)}
+                        value={field.value}
+                        onChange={(e) =>
+                          field.onChange(formatPhoneInput(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
                   {errors.family_phone ? (
                     <p className={errorClass} role="alert">
@@ -902,13 +1043,32 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                   <label htmlFor="family_phone_alt" className={labelClass}>
                     Father phone (alternate)
                   </label>
-                  <input
-                    id="family_phone_alt"
-                    type="tel"
-                    autoComplete="tel"
-                    className={inputClass}
-                    {...register("family_phone_alt")}
+                  <Controller
+                    name="family_phone_alt"
+                    control={control}
+                    render={({ field }) => (
+                      <input
+                        id="family_phone_alt"
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="0305-1234567"
+                        maxLength={12}
+                        className={inputClass}
+                        aria-invalid={Boolean(errors.family_phone_alt)}
+                        value={field.value}
+                        onChange={(e) =>
+                          field.onChange(formatPhoneInput(e.target.value))
+                        }
+                        onBlur={field.onBlur}
+                      />
+                    )}
                   />
+                  {errors.family_phone_alt ? (
+                    <p className={errorClass} role="alert">
+                      {errors.family_phone_alt.message}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1038,9 +1198,13 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                 type="submit"
                 disabled={!canSave || isSubmitting}
                 title={
-                  canSave
-                    ? undefined
-                    : "Fill all required fields to save"
+                  cnicDuplicateBlocked
+                    ? DUPLICATE_MSG
+                    : cnicLookupPending
+                      ? "Checking CNIC…"
+                      : canSave
+                        ? undefined
+                        : "Fill all required fields to save"
                 }
                 className="inline-flex min-w-[160px] items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
               >

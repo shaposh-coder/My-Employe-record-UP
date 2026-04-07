@@ -19,6 +19,7 @@ import { EmployeeDetailModal } from "@/components/employees/employee-detail-moda
 import type { EmployeeListRow } from "@/components/employees/employee-list-row";
 import { EmployeesFilterBar } from "@/components/employees/employees-filter-bar";
 import { EmployeesPagination } from "@/components/employees/employees-pagination";
+import { EmployeesTableLoadingOverlay } from "@/components/employees/employees-table-loading-overlay";
 import { EmployeesTableSkeleton } from "@/components/employees/employees-table-skeleton";
 import { EmployeesTable } from "@/components/employees/employees-table";
 import { fetchEmployeeFilterOptions } from "@/lib/fetch-employee-filter-options";
@@ -102,9 +103,6 @@ export default function EmployeesPage() {
     [department, section, city],
   );
 
-  /** Server-filtered rows for the current page (stable ref when data unchanged). */
-  const displayRows = useMemo(() => rows, [rows]);
-
   useEffect(() => {
     void fetchEmployeeFilterOptions().then((r) => {
       if (r.error) return;
@@ -122,9 +120,11 @@ export default function EmployeesPage() {
     });
     setLoadError(error);
     if (error) {
-      setRows([]);
-      setTotalCount(0);
-      return { rows: [] as EmployeeListRow[], total: 0, error };
+      return {
+        rows: [] as EmployeeListRow[],
+        total: 0,
+        error,
+      };
     }
     setRows(next);
     setTotalCount(total);
@@ -256,31 +256,24 @@ export default function EmployeesPage() {
   const employeesTopbarSlot = useMemo(
     () => (
       <>
-        {ready ? (
-          <EmployeesFilterBar
-            variant="toolbar"
-            searchQuery={searchInput}
-            onSearchChange={setSearchInput}
-            department={department}
-            section={section}
-            city={city}
-            onDepartmentChange={handleDepartmentChange}
-            onSectionChange={handleSectionChange}
-            onCityChange={handleCityChange}
-            departmentOptions={departmentOptions}
-            sectionOptions={sectionOptions}
-            cityOptions={cityOptions}
-            onClearFilters={handleClearFilters}
-            hasActiveFilters={hasActiveFilters}
-            activeFilterCount={activeFilterCount}
-            filterControlsDisabled={listLoading}
-          />
-        ) : (
-          <div
-            className="h-11 w-full max-w-[200px] shrink-0 rounded-xl border border-slate-200/80 bg-slate-100/80 sm:max-w-[240px] md:max-w-[16rem] dark:border-slate-700 dark:bg-slate-800/80"
-            aria-hidden
-          />
-        )}
+        <EmployeesFilterBar
+          variant="toolbar"
+          searchQuery={searchInput}
+          onSearchChange={setSearchInput}
+          department={department}
+          section={section}
+          city={city}
+          onDepartmentChange={handleDepartmentChange}
+          onSectionChange={handleSectionChange}
+          onCityChange={handleCityChange}
+          departmentOptions={departmentOptions}
+          sectionOptions={sectionOptions}
+          cityOptions={cityOptions}
+          onClearFilters={handleClearFilters}
+          hasActiveFilters={hasActiveFilters}
+          activeFilterCount={activeFilterCount}
+          filterControlsDisabled={listLoading}
+        />
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <EmployeesColumnPicker
             visibility={visibility}
@@ -297,7 +290,6 @@ export default function EmployeesPage() {
       </>
     ),
     [
-      ready,
       searchInput,
       department,
       section,
@@ -341,24 +333,20 @@ export default function EmployeesPage() {
         />
       ) : (
         <div className="flex max-h-[min(75vh,calc(100vh-12rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-          <div className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
-            {listLoading ? (
-              <EmployeesTableSkeleton
-                visibility={visibility}
-                rowCount={pageSize}
-                embedInCard
-              />
-            ) : (
-              <EmployeesTable
-                embedInCard
-                rows={displayRows}
-                visibility={visibility}
-                onDelete={handleDelete}
-                onEmployeeNameClick={openEmployeeDetail}
-                onToggleStatus={handleToggleStatus}
-                statusUpdatingId={statusUpdatingId}
-              />
-            )}
+          <div
+            className="relative min-h-[min(50vh,24rem)] min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl"
+            aria-busy={listLoading}
+          >
+            <EmployeesTableLoadingOverlay active={listLoading} />
+            <EmployeesTable
+              embedInCard
+              rows={rows}
+              visibility={visibility}
+              onDelete={handleDelete}
+              onEmployeeNameClick={openEmployeeDetail}
+              onToggleStatus={handleToggleStatus}
+              statusUpdatingId={statusUpdatingId}
+            />
           </div>
           <EmployeesPagination
             page={page}

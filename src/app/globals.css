@@ -25,3 +25,19 @@ body {
   transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Employee directory refetch — thin indeterminate bar */
+@keyframes employees-table-load-slider {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(380%);
+  }
+}
+
+@layer utilities {
+  .animate-employees-table-load-slider {
+    animation: employees-table-load-slider 1.15s ease-in-out infinite;
+  }
+}
