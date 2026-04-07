@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ExternalLink,
   FileImage,
   Loader2,
+  Pencil,
   User,
   Users,
   X,
@@ -142,6 +144,7 @@ export function EmployeeDetailModal({
   onClose: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("personal");
+  const tabScrollRef = useRef<HTMLDivElement>(null);
   const [row, setRow] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,6 +175,11 @@ export function EmployeeDetailModal({
   }, [employeeId, load]);
 
   useEffect(() => {
+    const el = tabScrollRef.current;
+    if (el) el.scrollTop = 0;
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!employeeId) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -198,7 +206,7 @@ export function EmployeeDetailModal({
   const headerAvatarUrl = txt(row?.profile_image);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
       <button
         type="button"
         className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
@@ -209,7 +217,7 @@ export function EmployeeDetailModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="employee-detail-title"
-        className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        className="relative z-10 flex h-[calc(100dvh-4rem)] min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl sm:h-[calc(100dvh-6rem)] dark:border-slate-700 dark:bg-slate-900"
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
@@ -244,14 +252,24 @@ export function EmployeeDetailModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" strokeWidth={2} />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={`/employees/${employeeId}/edit`}
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+              Edit
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         <div
@@ -281,7 +299,10 @@ export function EmployeeDetailModal({
           })}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
+        <div
+          ref={tabScrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6"
+        >
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
               <Loader2 className="h-6 w-6 animate-spin" aria-hidden />

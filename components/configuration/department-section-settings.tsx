@@ -1,9 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+} from "react";
+import {
+  AlertTriangle,
+  Eye,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
 
 export type DirectoryItem = {
   id: string;
@@ -22,6 +38,240 @@ function normalizeTitleKey(raw: string): string {
 
 function sortByTitle(a: DirectoryItem, b: DirectoryItem) {
   return a.title.localeCompare(b.title);
+}
+
+/**
+ * Values that might appear on `employees.department` / `employees.section` for this row
+ * (combobox saves title; spacing/casing may differ from the directory row).
+ */
+function employeeFieldValuesMatchingRow(row: DirectoryItem): string[] {
+  const raw = row.title ?? "";
+  const formatted = formatTitleForStorage(raw);
+  const trimmed = raw.trim();
+  const base = [formatted, trimmed, raw].filter(
+    (s) => typeof s === "string" && s.length > 0,
+  );
+  const out = new Set<string>();
+  for (const s of base) {
+    out.add(s);
+    out.add(s.toLowerCase());
+  }
+  return [...out];
+}
+
+/** How many employees use this department/section (normalized title match). */
+function countEmployeesForDirectoryRow(
+  row: DirectoryItem,
+  employeeValues: string[],
+): number {
+  const rowKey = formatTitleForStorage(row.title);
+  if (!rowKey) return 0;
+  return employeeValues.reduce(
+    (acc, v) => acc + (formatTitleForStorage(v) === rowKey ? 1 : 0),
+    0,
+  );
+}
+
+function isDirectoryRowUsedByEmployees(
+  row: DirectoryItem,
+  employeeValues: string[],
+): boolean {
+  return countEmployeesForDirectoryRow(row, employeeValues) > 0;
+}
+
+/** e.g. 5 → "(05)", 42 → "(42)", 150 → "(150)" */
+function formatEmployeeCountLabel(count: number): string {
+  const n = Math.max(0, Math.floor(Number.isFinite(count) ? count : 0));
+  const inner = n < 100 ? String(n).padStart(2, "0") : String(n);
+  return `(${inner})`;
+}
+
+type EmployeeMiniRow = {
+  id: string;
+  full_name: string | null;
+  profile_image: string | null;
+  phone_no: string | null;
+  department: string | null;
+  section: string | null;
+};
+
+function EmployeesInDirectoryModal({
+  open,
+  onClose,
+  field,
+  item,
+  onViewEmployee,
+}: {
+  open: boolean;
+  onClose: () => void;
+  field: "department" | "section";
+  item: DirectoryItem | null;
+  onViewEmployee: (employeeId: string) => void;
+}) {
+  const titleId = useId();
+  const [rows, setRows] = useState<EmployeeMiniRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !item) {
+      setRows([]);
+      setErr(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    const candidates = employeeFieldValuesMatchingRow(item);
+    if (candidates.length === 0) {
+      setLoading(false);
+      setRows([]);
+      return;
+    }
+    const col = field === "department" ? "department" : "section";
+    const supabase = createClient();
+    const rowKey = formatTitleForStorage(item.title);
+
+    void supabase
+      .from("employees")
+      .select(
+        "id, full_name, profile_image, phone_no, department, section",
+      )
+      .in(col, candidates)
+      .order("full_name")
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setLoading(false);
+        if (error) {
+          setErr(error.message);
+          setRows([]);
+          return;
+        }
+        const list = (data ?? []) as EmployeeMiniRow[];
+        const filtered = list.filter((r) => {
+          const val = field === "department" ? r.department : r.section;
+          return formatTitleForStorage(String(val ?? "")) === rowKey;
+        });
+        setRows(filtered);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, item, field]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open || !item) return null;
+
+  const label = field === "department" ? "Department" : "Section";
+  const displayTitle = formatTitleForStorage(item.title);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close"
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] dark:bg-black/70"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 flex max-h-[min(85vh,32rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div className="min-w-0">
+            <h3
+              id={titleId}
+              className="text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
+              {label}: {displayTitle}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500 dark:text-slate-400">
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              Loading…
+            </div>
+          ) : err ? (
+            <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {err}
+            </p>
+          ) : rows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              No employees in this {label.toLowerCase()}.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {rows.map((emp) => (
+                <li key={emp.id}>
+                  <div className="flex items-center gap-3 py-3">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:ring-slate-600">
+                      {emp.profile_image?.trim() ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- Supabase public URL
+                        <img
+                          src={emp.profile_image}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-400 dark:text-slate-500">
+                          <User className="h-5 w-5" strokeWidth={1.5} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900 dark:text-slate-100">
+                        {emp.full_name?.trim() || "—"}
+                      </p>
+                      {emp.phone_no?.trim() ? (
+                        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                          {emp.phone_no}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onViewEmployee(emp.id)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      <Eye className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                      View
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ItemFormModal({
@@ -261,6 +511,9 @@ function DirectoryPanel({
   onAdd,
   onUpdate,
   onDelete,
+  isDeleteDisabled,
+  employeeCount,
+  onShowEmployees,
 }: {
   title: string;
   items: DirectoryItem[];
@@ -270,6 +523,12 @@ function DirectoryPanel({
     item: { title: string; description: string },
   ) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
+  /** When true, delete control is disabled (e.g. row still referenced by employees). */
+  isDeleteDisabled?: (item: DirectoryItem) => boolean;
+  /** Employees assigned to this row (for title suffix like "Studio (05)"). */
+  employeeCount: (item: DirectoryItem) => number;
+  /** Opens popup listing employees for this department or section. */
+  onShowEmployees: (item: DirectoryItem) => void;
 }) {
   const [addOpen, setAddOpen] = useState(false);
   const [editState, setEditState] = useState<{
@@ -362,8 +621,22 @@ function DirectoryPanel({
                   key={item.id}
                   className="border-b border-slate-50 last:border-0 dark:border-slate-800/80"
                 >
-                  <td className="px-6 py-3 font-medium text-slate-800 dark:text-slate-200">
-                    {item.title}
+                  <td className="px-6 py-3 text-slate-800 dark:text-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => onShowEmployees(item)}
+                      className="group inline-flex max-w-full flex-wrap items-baseline gap-x-0 text-left transition"
+                    >
+                      <span className="font-medium text-slate-800 underline-offset-2 group-hover:underline dark:text-slate-200">
+                        {item.title}
+                      </span>
+                      <span
+                        className="ml-1.5 font-normal tabular-nums text-slate-500 group-hover:text-slate-600 dark:text-slate-400 dark:group-hover:text-slate-300"
+                        title="Click to see employees"
+                      >
+                        {formatEmployeeCountLabel(employeeCount(item))}
+                      </span>
+                    </button>
                   </td>
                   <td className="max-w-[min(12rem,40vw)] px-6 py-3 text-slate-600 dark:text-slate-400">
                     {item.description ? (
@@ -386,14 +659,27 @@ function DirectoryPanel({
                       </button>
                       <button
                         type="button"
+                        disabled={isDeleteDisabled?.(item) === true}
+                        title={
+                          isDeleteDisabled?.(item)
+                            ? "In use by at least one employee — cannot delete"
+                            : undefined
+                        }
                         onClick={() => {
+                          if (isDeleteDisabled?.(item)) return;
                           const ok = window.confirm(
                             `Delete “${item.title}”? This cannot be undone.`,
                           );
                           if (ok) void onDelete(item.id);
                         }}
-                        className="rounded-lg p-2 text-slate-600 transition hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                        className={[
+                          "rounded-lg p-2 transition",
+                          isDeleteDisabled?.(item)
+                            ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
+                            : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
+                        ].join(" ")}
                         aria-label={`Delete ${item.title}`}
+                        aria-disabled={isDeleteDisabled?.(item) === true}
                       >
                         <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
                       </button>
@@ -412,8 +698,41 @@ function DirectoryPanel({
 export function DepartmentSectionSettings() {
   const [departments, setDepartments] = useState<DirectoryItem[]>([]);
   const [sections, setSections] = useState<DirectoryItem[]>([]);
+  const [employeeDepartmentValues, setEmployeeDepartmentValues] = useState<
+    string[]
+  >([]);
+  const [employeeSectionValues, setEmployeeSectionValues] = useState<string[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [employeeListModal, setEmployeeListModal] = useState<{
+    field: "department" | "section";
+    item: DirectoryItem;
+  } | null>(null);
+  const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
+
+  const refreshEmployeeUsage = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("employees")
+      .select("department, section");
+    const dept: string[] = [];
+    const sec: string[] = [];
+    for (const r of data ?? []) {
+      if (
+        typeof r.department === "string" &&
+        r.department.trim() !== ""
+      ) {
+        dept.push(r.department);
+      }
+      if (typeof r.section === "string" && r.section.trim() !== "") {
+        sec.push(r.section);
+      }
+    }
+    setEmployeeDepartmentValues(dept);
+    setEmployeeSectionValues(sec);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -439,6 +758,8 @@ export function DepartmentSectionSettings() {
       }
       setDepartments((dRes.data as DirectoryItem[]) ?? []);
       setSections((sRes.data as DirectoryItem[]) ?? []);
+      await refreshEmployeeUsage();
+      if (cancelled) return;
       setLoading(false);
     }
 
@@ -446,7 +767,7 @@ export function DepartmentSectionSettings() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshEmployeeUsage]);
 
   async function addDepartment(item: { title: string; description: string }) {
     const supabase = createClient();
@@ -528,6 +849,7 @@ export function DepartmentSectionSettings() {
         .map((row) => (row.id === id ? (data as DirectoryItem) : row))
         .sort(sortByTitle),
     );
+    void refreshEmployeeUsage();
   }
 
   async function updateSection(
@@ -560,26 +882,87 @@ export function DepartmentSectionSettings() {
         .map((row) => (row.id === id ? (data as DirectoryItem) : row))
         .sort(sortByTitle),
     );
+    void refreshEmployeeUsage();
   }
 
   async function deleteDepartment(id: string) {
+    const row = departments.find((d) => d.id === id);
+    if (!row) return;
+
+    const candidates = employeeFieldValuesMatchingRow(row);
+    if (candidates.length === 0) {
+      toast.error("Could not delete department", {
+        description: "Invalid department title.",
+      });
+      return;
+    }
+
     const supabase = createClient();
+    const { data: inUseRows, error: useError } = await supabase
+      .from("employees")
+      .select("id")
+      .in("department", candidates)
+      .limit(1);
+
+    if (useError) {
+      toast.error("Could not verify usage", { description: useError.message });
+      return;
+    }
+    if (inUseRows && inUseRows.length > 0) {
+      const label = formatTitleForStorage(row.title);
+      toast.error("Cannot delete department", {
+        description: `At least one employee still has department “${label}”. Update those employees first, then try again.`,
+      });
+      return;
+    }
+
     const { error } = await supabase.from("departments").delete().eq("id", id);
     if (error) {
       toast.error("Could not delete department", { description: error.message });
       throw error;
     }
-    setDepartments((prev) => prev.filter((row) => row.id !== id));
+    setDepartments((prev) => prev.filter((r) => r.id !== id));
+    void refreshEmployeeUsage();
   }
 
   async function deleteSection(id: string) {
+    const row = sections.find((s) => s.id === id);
+    if (!row) return;
+
+    const candidates = employeeFieldValuesMatchingRow(row);
+    if (candidates.length === 0) {
+      toast.error("Could not delete section", {
+        description: "Invalid section title.",
+      });
+      return;
+    }
+
     const supabase = createClient();
+    const { data: inUseRows, error: useError } = await supabase
+      .from("employees")
+      .select("id")
+      .in("section", candidates)
+      .limit(1);
+
+    if (useError) {
+      toast.error("Could not verify usage", { description: useError.message });
+      return;
+    }
+    if (inUseRows && inUseRows.length > 0) {
+      const label = formatTitleForStorage(row.title);
+      toast.error("Cannot delete section", {
+        description: `At least one employee still has section “${label}”. Update those employees first, then try again.`,
+      });
+      return;
+    }
+
     const { error } = await supabase.from("sections").delete().eq("id", id);
     if (error) {
       toast.error("Could not delete section", { description: error.message });
       throw error;
     }
-    setSections((prev) => prev.filter((row) => row.id !== id));
+    setSections((prev) => prev.filter((r) => r.id !== id));
+    void refreshEmployeeUsage();
   }
 
   if (loading) {
@@ -615,21 +998,52 @@ export function DepartmentSectionSettings() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
-      <DirectoryPanel
-        title="Departments"
-        items={departments}
-        onAdd={addDepartment}
-        onUpdate={updateDepartment}
-        onDelete={deleteDepartment}
+    <>
+      <EmployeeDetailModal
+        employeeId={detailEmployeeId}
+        onClose={() => setDetailEmployeeId(null)}
       />
-      <DirectoryPanel
-        title="Sections"
-        items={sections}
-        onAdd={addSection}
-        onUpdate={updateSection}
-        onDelete={deleteSection}
+      <EmployeesInDirectoryModal
+        open={employeeListModal !== null}
+        onClose={() => setEmployeeListModal(null)}
+        field={employeeListModal?.field ?? "department"}
+        item={employeeListModal?.item ?? null}
+        onViewEmployee={(id) => setDetailEmployeeId(id)}
       />
-    </div>
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+        <DirectoryPanel
+          title="Departments"
+          items={departments}
+          onAdd={addDepartment}
+          onUpdate={updateDepartment}
+          onDelete={deleteDepartment}
+          employeeCount={(item) =>
+            countEmployeesForDirectoryRow(item, employeeDepartmentValues)
+          }
+          isDeleteDisabled={(item) =>
+            isDirectoryRowUsedByEmployees(item, employeeDepartmentValues)
+          }
+          onShowEmployees={(item) =>
+            setEmployeeListModal({ field: "department", item })
+          }
+        />
+        <DirectoryPanel
+          title="Sections"
+          items={sections}
+          onAdd={addSection}
+          onUpdate={updateSection}
+          onDelete={deleteSection}
+          employeeCount={(item) =>
+            countEmployeesForDirectoryRow(item, employeeSectionValues)
+          }
+          isDeleteDisabled={(item) =>
+            isDirectoryRowUsedByEmployees(item, employeeSectionValues)
+          }
+          onShowEmployees={(item) =>
+            setEmployeeListModal({ field: "section", item })
+          }
+        />
+      </div>
+    </>
   );
 }

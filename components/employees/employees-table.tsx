@@ -1,5 +1,8 @@
-import type { CSSProperties, ReactNode } from "react";
-import type { EmployeeColumnId } from "@/lib/employee-table-columns";
+import type { ReactNode } from "react";
+import {
+  ensureFixedColumnVisibility,
+  type EmployeeColumnId,
+} from "@/lib/employee-table-columns";
 import { EmployeeSocialLinksCell } from "./employee-social-links-cell";
 import { EmployeeRowActionsMenu } from "./employee-row-actions-menu";
 import type { EmployeeListRow } from "./employee-list-row";
@@ -10,27 +13,46 @@ function fmt(value: string | null | undefined): ReactNode {
   if (value == null || String(value).trim() === "") {
     return <span className="text-slate-400 dark:text-slate-500">—</span>;
   }
-  return <span className="break-words">{value}</span>;
+  return <span>{value}</span>;
 }
 
-function profileImageCell(url: string | null | undefined): ReactNode {
+function profileImageCell(
+  url: string | null | undefined,
+  onOpenDetail?: (id: string) => void,
+  employeeId?: string,
+): ReactNode {
   const u = url?.trim();
-  if (!u) {
-    return (
+  const clickable = Boolean(onOpenDetail && employeeId);
+
+  const inner =
+    !u ? (
       <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
         —
       </span>
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs; avoid next.config remotePatterns churn
+      <img
+        src={u}
+        alt=""
+        className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-600"
+        loading="lazy"
+      />
+    );
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        className="inline-flex rounded-full text-left transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900"
+        aria-label="View employee details"
+        onClick={() => onOpenDetail!(employeeId!)}
+      >
+        {inner}
+      </button>
     );
   }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- Supabase public URLs; avoid next.config remotePatterns churn
-    <img
-      src={u}
-      alt=""
-      className="h-10 w-10 rounded-full object-cover ring-1 ring-slate-200 dark:ring-slate-600"
-      loading="lazy"
-    />
-  );
+
+  return inner;
 }
 
 function statusBadge(status: string | null): ReactNode {
@@ -58,11 +80,20 @@ type ColDef = {
   tdClass?: string;
 };
 
-function colWidthStyle(colId: EmployeeColumnId): CSSProperties | undefined {
-  if (colId === "image") return { width: "3.5rem" };
-  if (colId === "social") return { width: "4.5rem" };
-  if (colId === "action") return { width: "3.25rem" };
-  return undefined;
+/** Minimum column widths — auto table layout + horizontal scroll when needed. */
+function columnMinClass(colId: EmployeeColumnId): string {
+  switch (colId) {
+    case "image":
+      return "min-w-[3.5rem]";
+    case "social":
+      return "min-w-[4.5rem]";
+    case "action":
+      return "min-w-[3.25rem]";
+    case "status":
+      return "min-w-[6.5rem]";
+    default:
+      return "min-w-[150px]";
+  }
 }
 
 function buildColumnDefs(
@@ -76,8 +107,9 @@ function buildColumnDefs(
       id: "image",
       header: "IMAGE",
       thClass: "text-left",
-      cell: (row) => profileImageCell(row.profile_image),
-      tdClass: "min-w-0 align-middle",
+      cell: (row) =>
+        profileImageCell(row.profile_image, onEmployeeNameClick, row.id),
+      tdClass: "align-middle",
     },
     {
       id: "name",
@@ -96,20 +128,16 @@ function buildColumnDefs(
             {fmt(row.full_name)}
           </span>
         ),
-      tdClass: "min-w-0",
     },
     {
       id: "father_name",
       header: "FATHER NAME",
       cell: (row) => fmt(row.father_name),
-      tdClass: "max-w-[9rem]",
     },
     {
       id: "dob",
       header: "DATE OF BIRTH",
-      cell: (row) => (
-        <span className="whitespace-nowrap">{fmt(row.dob)}</span>
-      ),
+      cell: (row) => fmt(row.dob),
     },
     {
       id: "cnic",
@@ -117,56 +145,46 @@ function buildColumnDefs(
       cell: (row) => (
         <span className="font-mono text-xs">{fmt(row.cnic_no)}</span>
       ),
-      tdClass: "max-w-[9rem]",
     },
     {
       id: "ss_eubi",
       header: "SOCIAL SECURITY / EUBI",
       cell: (row) => fmt(row.ss_eubi_no),
-      tdClass: "max-w-[8rem]",
     },
     {
       id: "phone",
       header: "PHONE NUMBER",
-      cell: (row) => (
-        <span className="whitespace-nowrap">{fmt(row.phone_no)}</span>
-      ),
+      cell: (row) => fmt(row.phone_no),
     },
     {
       id: "city",
       header: "CITY",
       cell: (row) => fmt(row.city),
-      tdClass: "max-w-[8rem]",
     },
     {
       id: "department",
       header: "DEPARTMENT",
       cell: (row) => fmt(row.department),
-      tdClass: "max-w-[8rem]",
     },
     {
       id: "section",
       header: "SECTION",
       cell: (row) => fmt(row.section),
-      tdClass: "max-w-[8rem]",
     },
     {
       id: "education",
       header: "EDUCATION",
       cell: (row) => fmt(row.education),
-      tdClass: "max-w-[12rem]",
     },
     {
       id: "address",
       header: "ADDRESS",
       cell: (row) => fmt(row.address),
-      tdClass: "max-w-[14rem]",
     },
     {
       id: "experience",
       header: "EXPERIENCE",
       cell: (row) => fmt(row.experience),
-      tdClass: "max-w-[12rem]",
     },
     {
       id: "social",
@@ -179,28 +197,22 @@ function buildColumnDefs(
           social_media_link={row.social_media_link}
         />
       ),
-      tdClass: "w-[4.5rem]",
     },
     {
       id: "email",
       header: "EMAIL ADDRESS",
-      cell: (row) => (
-        <span className="break-all">{fmt(row.email_address)}</span>
-      ),
-      tdClass: "max-w-[12rem]",
+      cell: (row) => fmt(row.email_address),
     },
     {
       id: "reference",
       header: "REFERENCE",
       cell: (row) => fmt(row.reference_info),
-      tdClass: "max-w-[12rem]",
     },
     {
       id: "fam_father",
       header: "FATHER NAME",
       familyGroup: true,
       cell: (row) => fmt(row.family_father_name),
-      tdClass: "max-w-[9rem]",
     },
     {
       id: "fam_cnic",
@@ -209,23 +221,18 @@ function buildColumnDefs(
       cell: (row) => (
         <span className="font-mono text-xs">{fmt(row.family_cnic)}</span>
       ),
-      tdClass: "max-w-[9rem]",
     },
     {
       id: "fam_phone",
       header: "PHONE (MAIN)",
       familyGroup: true,
-      cell: (row) => (
-        <span className="whitespace-nowrap">{fmt(row.family_phone)}</span>
-      ),
+      cell: (row) => fmt(row.family_phone),
     },
     {
       id: "fam_phone_alt",
       header: "PHONE (ALT)",
       familyGroup: true,
-      cell: (row) => (
-        <span className="whitespace-nowrap">{fmt(row.family_phone_alt)}</span>
-      ),
+      cell: (row) => fmt(row.family_phone_alt),
     },
     {
       id: "status",
@@ -256,6 +263,8 @@ export function EmployeesTable({
   onEmployeeNameClick,
   onToggleStatus,
   statusUpdatingId,
+  /** When true, no outer card border/radius — use inside a parent card with a footer. */
+  embedInCard = false,
 }: {
   rows: EmployeeListRow[];
   visibility: Record<EmployeeColumnId, boolean>;
@@ -265,6 +274,7 @@ export function EmployeesTable({
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   /** When set, the status button for this row shows a spinner. */
   statusUpdatingId?: string | null;
+  embedInCard?: boolean;
 }) {
   const defs = buildColumnDefs(
     onDelete,
@@ -272,7 +282,8 @@ export function EmployeesTable({
     onToggleStatus,
     statusUpdatingId,
   );
-  const filtered = defs.filter((d) => visibility[d.id] === true);
+  const effectiveVisibility = ensureFixedColumnVisibility(visibility);
+  const filtered = defs.filter((d) => effectiveVisibility[d.id] === true);
   const visible =
     filtered.length > 0
       ? filtered
@@ -283,47 +294,50 @@ export function EmployeesTable({
   const thBase =
     "whitespace-nowrap px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400";
   const tdBase =
-    "min-w-0 px-4 py-3 align-middle text-slate-800 dark:text-slate-200";
+    "whitespace-nowrap px-4 py-3 align-middle text-slate-800 dark:text-slate-200";
+
+  const shellClass = embedInCard
+    ? "bg-white dark:bg-slate-900"
+    : "rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]";
 
   return (
-    <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-      <table className="w-full table-fixed border-collapse text-left text-sm">
-        <colgroup>
-          {visible.map((col) => (
-            <col key={col.id} style={colWidthStyle(col.id)} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
-            {visible.map((col, i) => (
-              <th
-                key={col.id}
-                scope="col"
-                className={[
-                  thBase,
-                  col.thClass ?? "",
-                  i === firstFamilyIdx && firstFamilyIdx >= 0
-                    ? "border-l border-slate-200 dark:border-slate-700"
-                    : "",
-                ].join(" ")}
-              >
-                {col.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td
-                colSpan={colCount}
-                className="px-6 py-12 text-center text-slate-500 dark:text-slate-400"
-              >
-                No employees yet. Add one from{" "}
+    <div className={["min-w-0 w-full", shellClass].join(" ")}>
+      <div className="w-full min-w-0 overflow-x-auto">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
+              {visible.map((col, i) => (
+                <th
+                  key={col.id}
+                  scope="col"
+                  className={[
+                    thBase,
+                    columnMinClass(col.id),
+                    col.thClass ?? "",
+                    i === firstFamilyIdx && firstFamilyIdx >= 0
+                      ? "border-l border-slate-200 dark:border-slate-700"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {col.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={colCount}
+                  className="whitespace-normal px-6 py-12 text-center text-slate-500 dark:text-slate-400"
+                >
+                No employees yet. Use the{" "}
                 <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Add employee
-                </span>
-                .
+                  Add
+                </span>{" "}
+                button above.
               </td>
             </tr>
           ) : (
@@ -337,11 +351,14 @@ export function EmployeesTable({
                     key={col.id}
                     className={[
                       tdBase,
+                      columnMinClass(col.id),
                       col.tdClass ?? "",
                       i === firstFamilyIdx && firstFamilyIdx >= 0
                         ? "border-l border-slate-100 dark:border-slate-800"
                         : "",
-                    ].join(" ")}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {col.cell(row)}
                   </td>
@@ -349,8 +366,9 @@ export function EmployeesTable({
               </tr>
             ))
           )}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

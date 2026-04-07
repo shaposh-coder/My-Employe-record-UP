@@ -29,6 +29,36 @@ export const EMPLOYEE_COLUMN_IDS = [
 
 export type EmployeeColumnId = (typeof EMPLOYEE_COLUMN_IDS)[number];
 
+/** Always visible — cannot be hidden in the column picker. */
+export const EMPLOYEE_FIXED_COLUMN_IDS: readonly EmployeeColumnId[] = [
+  "image",
+  "name",
+  "city",
+  "department",
+  "section",
+  "social",
+  "status",
+  "cnic",
+  "action",
+];
+
+const FIXED = new Set<EmployeeColumnId>(EMPLOYEE_FIXED_COLUMN_IDS);
+
+export function isFixedEmployeeColumn(id: EmployeeColumnId): boolean {
+  return FIXED.has(id);
+}
+
+/** Forces fixed columns to `true` (e.g. after loading localStorage or toggling). */
+export function ensureFixedColumnVisibility(
+  v: Record<EmployeeColumnId, boolean>,
+): Record<EmployeeColumnId, boolean> {
+  const next = { ...v };
+  for (const id of EMPLOYEE_FIXED_COLUMN_IDS) {
+    next[id] = true;
+  }
+  return next;
+}
+
 export const EMPLOYEE_COLUMN_LABELS: Record<EmployeeColumnId, string> = {
   image: "IMAGE",
   name: "NAME",
@@ -54,21 +84,14 @@ export const EMPLOYEE_COLUMN_LABELS: Record<EmployeeColumnId, string> = {
   action: "ACTION",
 };
 
-const DEFAULT_VISIBLE = new Set<EmployeeColumnId>([
-  "image",
-  "name",
-  "city",
-  "department",
-  "section",
-  "phone",
-  "status",
-  "action",
-]);
+/** Optional columns that start visible for new users (fixed columns are always on). */
+const DEFAULT_OPTIONAL_VISIBLE = new Set<EmployeeColumnId>(["phone"]);
 
 export function defaultColumnVisibility(): Record<EmployeeColumnId, boolean> {
   const v = {} as Record<EmployeeColumnId, boolean>;
   for (const id of EMPLOYEE_COLUMN_IDS) {
-    v[id] = DEFAULT_VISIBLE.has(id);
+    v[id] =
+      FIXED.has(id) || DEFAULT_OPTIONAL_VISIBLE.has(id);
   }
   return v;
 }
@@ -82,7 +105,7 @@ export function loadColumnVisibility(): Record<EmployeeColumnId, boolean> {
     const parsed = JSON.parse(raw) as Partial<
       Record<EmployeeColumnId, boolean>
     >;
-    return { ...base, ...parsed };
+    return ensureFixedColumnVisibility({ ...base, ...parsed });
   } catch {
     return base;
   }
@@ -91,5 +114,8 @@ export function loadColumnVisibility(): Record<EmployeeColumnId, boolean> {
 export function saveColumnVisibility(
   v: Record<EmployeeColumnId, boolean>,
 ): void {
-  localStorage.setItem(EMPLOYEES_COLUMN_VISIBILITY_KEY, JSON.stringify(v));
+  localStorage.setItem(
+    EMPLOYEES_COLUMN_VISIBILITY_KEY,
+    JSON.stringify(ensureFixedColumnVisibility(v)),
+  );
 }

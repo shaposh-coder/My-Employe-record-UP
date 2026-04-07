@@ -16,7 +16,17 @@ export const DEFAULT_EMPLOYEES_PAGE_SIZE: EmployeesPageSize = 50;
 export type FetchEmployeesOptions = {
   page?: number;
   pageSize?: number;
+  /** Trims; matches name, phone, or city (ilike). */
+  search?: string;
+  department?: string;
+  section?: string;
+  city?: string;
 };
+
+/** Strip characters that break PostgREST `or()` filter strings. */
+function sanitizeSearchToken(raw: string): string {
+  return raw.replace(/,/g, " ").trim();
+}
 
 /** Load employees for the directory table (newest first), with optional pagination. */
 export async function fetchEmployeesForTable(
@@ -33,11 +43,35 @@ export async function fetchEmployeesForTable(
 
   try {
     const supabase = createClient();
-    const { data, error, count } = await supabase
+    let query = supabase
       .from("employees")
       .select(SELECT_COLUMNS, { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to);
+      .order("created_at", { ascending: false });
+
+    const searchRaw = options?.search?.trim();
+    if (searchRaw) {
+      const token = sanitizeSearchToken(searchRaw)
+        .replace(/%/g, "")
+        .replace(/_/g, "")
+        .slice(0, 200);
+      if (token.length > 0) {
+        const p = `%${token}%`;
+        query = query.or(
+          `full_name.ilike.${p},phone_no.ilike.${p},city.ilike.${p}`,
+        );
+      }
+    }
+
+    const dept = options?.department?.trim();
+    if (dept) query = query.eq("department", dept);
+
+    const sec = options?.section?.trim();
+    if (sec) query = query.eq("section", sec);
+
+    const city = options?.city?.trim();
+    if (city) query = query.eq("city", city);
+
+    const { data, error, count } = await query.range(from, to);
     if (error) return { rows: [], total: 0, error: error.message };
     const total = count ?? 0;
     if (!data?.length) return { rows: [], total, error: null };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
@@ -140,6 +140,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   const [draftId, setDraftId] = useState(() => editEmployeeId ?? crypto.randomUUID());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("personal");
+  const tabScrollRef = useRef<HTMLDivElement>(null);
   const [departments, setDepartments] = useState<ConfigOptionRow[]>([]);
   const [sections, setSections] = useState<ConfigOptionRow[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
@@ -178,6 +179,11 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       shouldDirty: false,
     });
   }, [fatherName, setValue]);
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (el) el.scrollTop = 0;
+  }, [activeTab]);
 
   useEffect(() => {
     const id = editEmployeeId;
@@ -458,11 +464,11 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       ) : null}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-0">
-        <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+        <div className="flex h-[calc(100dvh-7.5rem)] min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
           <div
             role="tablist"
             aria-label="Employee form sections"
-            className="flex flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60"
+            className="flex shrink-0 flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60"
           >
             {TABS.map((tab) => {
               const selected = activeTab === tab.id;
@@ -489,7 +495,10 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
             })}
           </div>
 
-          <div className="p-6 sm:p-10">
+          <div
+            ref={tabScrollRef}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:p-10"
+          >
             <div
               role="tabpanel"
               id="panel-personal"
@@ -995,7 +1004,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-slate-800 dark:bg-slate-950/40">
+          <div className="flex shrink-0 flex-col gap-4 border-t border-slate-100 bg-slate-50/50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8 dark:border-slate-800 dark:bg-slate-950/40">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

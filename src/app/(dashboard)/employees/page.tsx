@@ -2,16 +2,25 @@
 
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
+import { useTopbarEndSlot } from "@/components/dashboard/topbar-slot-context";
 import {
   EmployeesColumnPicker,
   useEmployeesColumnVisibility,
 } from "@/components/employees/employees-column-picker";
 import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
 import type { EmployeeListRow } from "@/components/employees/employee-list-row";
+import { EmployeesFilterBar } from "@/components/employees/employees-filter-bar";
 import { EmployeesPagination } from "@/components/employees/employees-pagination";
 import { EmployeesTable } from "@/components/employees/employees-table";
+import { fetchEmployeeFilterOptions } from "@/lib/fetch-employee-filter-options";
 import { createClient } from "@/lib/supabase/client";
 import {
   DEFAULT_EMPLOYEES_PAGE_SIZE,
@@ -21,6 +30,7 @@ import {
 } from "@/lib/fetch-employees";
 
 export default function EmployeesPage() {
+  const { setEndSlot } = useTopbarEndSlot();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] =
     useState<EmployeesPageSize>(DEFAULT_EMPLOYEES_PAGE_SIZE);
@@ -37,10 +47,71 @@ export default function EmployeesPage() {
   );
   const { visibility, setVisibility } = useEmployeesColumnVisibility();
 
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [department, setDepartment] = useState("");
+  const [section, setSection] = useState("");
+  const [city, setCity] = useState("");
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [sectionOptions, setSectionOptions] = useState<string[]>([]);
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+
+  /** Immediate UI: searchInput. Server filter uses debouncedSearch after 300ms. */
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const filterCriteria = useMemo(
+    () => ({
+      search: debouncedSearch.trim() || undefined,
+      department: department.trim() || undefined,
+      section: section.trim() || undefined,
+      city: city.trim() || undefined,
+    }),
+    [debouncedSearch, department, section, city],
+  );
+
+  const hasActiveFilters = useMemo(
+    () =>
+      Boolean(
+        debouncedSearch.trim() ||
+          department.trim() ||
+          section.trim() ||
+          city.trim(),
+      ),
+    [debouncedSearch, department, section, city],
+  );
+
+  const activeFilterCount = useMemo(
+    () =>
+      [department, section, city].filter((v) => v.trim() !== "").length,
+    [department, section, city],
+  );
+
+  /** Server-filtered rows for the current page (stable ref when data unchanged). */
+  const displayRows = useMemo(() => rows, [rows]);
+
+  useEffect(() => {
+    void fetchEmployeeFilterOptions().then((r) => {
+      if (r.error) return;
+      setDepartmentOptions(r.departments);
+      setSectionOptions(r.sections);
+      setCityOptions(r.cities);
+    });
+  }, []);
+
   const loadRows = useCallback(async () => {
     const { rows: next, total, error } = await fetchEmployeesForTable({
       page,
       pageSize,
+      ...filterCriteria,
     });
     setLoadError(error);
     if (error) {
@@ -51,7 +122,7 @@ export default function EmployeesPage() {
     setRows(next);
     setTotalCount(total);
     return { rows: next, total, error: null };
-  }, [page, pageSize]);
+  }, [page, pageSize, filterCriteria]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +141,12 @@ export default function EmployeesPage() {
   useEffect(() => {
     function onFocus() {
       void loadRows();
+      void fetchEmployeeFilterOptions().then((r) => {
+        if (r.error) return;
+        setDepartmentOptions(r.departments);
+        setSectionOptions(r.sections);
+        setCityOptions(r.cities);
+      });
     }
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -141,29 +218,105 @@ export default function EmployeesPage() {
     setPage(1);
   }, []);
 
-  return (
-    <div>
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Employee Management
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+  const handleClearFilters = useCallback(() => {
+    setSearchInput("");
+    setDebouncedSearch("");
+    setDepartment("");
+    setSection("");
+    setCity("");
+    setPage(1);
+  }, []);
+
+  const handleDepartmentChange = useCallback((v: string) => {
+    setDepartment(v);
+    setPage(1);
+  }, []);
+
+  const handleSectionChange = useCallback((v: string) => {
+    setSection(v);
+    setPage(1);
+  }, []);
+
+  const handleCityChange = useCallback((v: string) => {
+    setCity(v);
+    setPage(1);
+  }, []);
+
+  const openEmployeeDetail = useCallback((id: string) => {
+    setDetailEmployeeId(id);
+  }, []);
+
+  const employeesTopbarSlot = useMemo(
+    () => (
+      <>
+        {ready ? (
+          <EmployeesFilterBar
+            variant="toolbar"
+            searchQuery={searchInput}
+            onSearchChange={setSearchInput}
+            department={department}
+            section={section}
+            city={city}
+            onDepartmentChange={handleDepartmentChange}
+            onSectionChange={handleSectionChange}
+            onCityChange={handleCityChange}
+            departmentOptions={departmentOptions}
+            sectionOptions={sectionOptions}
+            cityOptions={cityOptions}
+            onClearFilters={handleClearFilters}
+            hasActiveFilters={hasActiveFilters}
+            activeFilterCount={activeFilterCount}
+            filterControlsDisabled={listLoading}
+          />
+        ) : (
+          <div
+            className="h-11 w-full max-w-[200px] shrink-0 rounded-xl border border-slate-200/80 bg-slate-100/80 sm:max-w-[240px] md:max-w-[16rem] dark:border-slate-700 dark:bg-slate-800/80"
+            aria-hidden
+          />
+        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <EmployeesColumnPicker
             visibility={visibility}
             onChange={setVisibility}
           />
           <Link
             href="/employees/new"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white sm:px-4"
           >
             <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-            Add employee
+            Add
           </Link>
         </div>
-      </div>
+      </>
+    ),
+    [
+      ready,
+      searchInput,
+      department,
+      section,
+      city,
+      departmentOptions,
+      sectionOptions,
+      cityOptions,
+      hasActiveFilters,
+      activeFilterCount,
+      listLoading,
+      visibility,
+      handleDepartmentChange,
+      handleSectionChange,
+      handleCityChange,
+      handleClearFilters,
+      setVisibility,
+    ],
+  );
 
+  useLayoutEffect(() => {
+    setEndSlot(employeesTopbarSlot);
+    return () => setEndSlot(null);
+  }, [employeesTopbarSlot, setEndSlot]);
+
+  return (
+    <div>
       {loadError ? (
         <p
           className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
@@ -183,23 +336,28 @@ export default function EmployeesPage() {
             listLoading ? "pointer-events-none opacity-60 transition-opacity" : ""
           }
         >
-          <EmployeesTable
-            rows={rows}
-            visibility={visibility}
-            onDelete={handleDelete}
-            onEmployeeNameClick={(id) => setDetailEmployeeId(id)}
-            onToggleStatus={handleToggleStatus}
-            statusUpdatingId={statusUpdatingId}
-          />
-          <EmployeesPagination
-            page={page}
-            pageSize={pageSize}
-            pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
-            total={totalCount}
-            disabled={listLoading}
-            onPageChange={setPage}
-            onPageSizeChange={handlePageSizeChange}
-          />
+          <div className="flex max-h-[min(75vh,calc(100vh-12rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <EmployeesTable
+                embedInCard
+                rows={displayRows}
+                visibility={visibility}
+                onDelete={handleDelete}
+                onEmployeeNameClick={openEmployeeDetail}
+                onToggleStatus={handleToggleStatus}
+                statusUpdatingId={statusUpdatingId}
+              />
+            </div>
+            <EmployeesPagination
+              page={page}
+              pageSize={pageSize}
+              pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
+              total={totalCount}
+              disabled={listLoading}
+              onPageChange={setPage}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </div>
         </div>
       )}
 

@@ -2,10 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { Menu, UserCircle } from "lucide-react";
+import { useTopbarEndSlot } from "./topbar-slot-context";
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/employees": "Employees",
+  "/employees": "Employee Management",
   "/employees/new": "Add employee",
   "/settings": "Settings",
   "/configuration": "Configuration",
@@ -29,10 +30,11 @@ type TopbarProps = {
 export function Topbar({ mobileOpen, onMenuClick }: TopbarProps) {
   const pathname = usePathname();
   const title = titleForPath(pathname);
+  const { endSlot } = useTopbarEndSlot();
 
   return (
-    <header className="sticky top-0 z-30 flex h-[3.75rem] shrink-0 items-center justify-between gap-4 border-b border-slate-200/80 bg-white/95 px-4 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 sm:px-6 lg:px-8">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="sticky top-0 z-30 flex h-[3.75rem] shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-4 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95 sm:gap-4 sm:px-6 lg:px-8">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/90 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 md:hidden dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -49,9 +51,14 @@ export function Topbar({ mobileOpen, onMenuClick }: TopbarProps) {
         </h1>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
+        {endSlot ? (
+          <div className="flex min-w-0 max-w-[min(100vw-10rem,28rem)] flex-wrap items-center justify-end gap-2 sm:max-w-[min(100vw-12rem,32rem)] md:max-w-none md:flex-nowrap">
+            {endSlot}
+          </div>
+        ) : null}
         <div
-          className="flex items-center gap-2.5 rounded-full border border-slate-200/90 bg-slate-50/80 py-1.5 pl-2 pr-3.5 dark:border-slate-700 dark:bg-slate-900/80"
+          className="flex shrink-0 items-center gap-2.5 rounded-full border border-slate-200/90 bg-slate-50/80 py-1.5 pl-2 pr-3.5 dark:border-slate-700 dark:bg-slate-900/80"
           role="status"
           aria-label="Admin profile (placeholder)"
         >
