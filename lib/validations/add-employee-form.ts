@@ -37,7 +37,7 @@ const optionalPhone = z
 
 export const addEmployeeSchema = z.object({
   full_name: z.string().min(1, "Full name is required").max(200),
-  status: z.enum(["Active", "Deactive"]),
+  status: z.enum(["Active", "Un-Active"]),
   father_name: z.string().min(1, "Father’s name is required").max(200),
   dob: z.string().min(1, "Date of birth is required"),
   cnic_no: cnicField("CNIC / national ID"),

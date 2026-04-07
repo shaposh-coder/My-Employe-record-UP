@@ -29,6 +29,7 @@ import {
   DUPLICATE_MSG,
   isEmployeeCnicTaken,
 } from "@/lib/check-cnic-duplicate";
+import { EMPLOYEE_STATUS } from "@/lib/employee-status";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -268,7 +269,10 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       const sl = (d.social_links as Record<string, string | null> | null) ?? {};
       reset({
         full_name: String(d.full_name ?? ""),
-        status: d.status === "Deactive" ? "Deactive" : "Active",
+        status:
+          d.status === EMPLOYEE_STATUS.UnActive || d.status === "Deactive"
+            ? EMPLOYEE_STATUS.UnActive
+            : EMPLOYEE_STATUS.Active,
         father_name: (() => {
           const a = String(d.father_name ?? "").trim();
           const b = String(d.family_father_name ?? "").trim();
@@ -613,8 +617,8 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                     className={inputClass}
                     {...register("status")}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Deactive">Deactive</option>
+                    <option value={EMPLOYEE_STATUS.Active}>Active</option>
+                    <option value={EMPLOYEE_STATUS.UnActive}>Un-Active</option>
                   </select>
                   {errors.status ? (
                     <p className={errorClass} role="alert">

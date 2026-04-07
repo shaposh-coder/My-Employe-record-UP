@@ -73,7 +73,7 @@ export function EmployeeRowActionsMenu({
   }, [open]);
 
   const isActive = (row.status ?? "Active") === "Active";
-  const nextVerb = isActive ? "Deactivate" : "Activate";
+  const nextVerb = isActive ? "Mark Un-Active" : "Activate";
   const busy = statusUpdatingId === row.id;
 
   const menu = open && menuPos && (

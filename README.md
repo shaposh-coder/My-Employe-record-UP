@@ -30,7 +30,7 @@ A modern **employee directory and HR-style record system** built with Next.js an
 
 - **Employee directory** — Searchable, filterable table with configurable columns, pagination, and real-time filtering (debounced server queries).
 - **Rich employee profiles** — Multi-tab add/edit forms covering personal details, work & education, social links, family information, and document uploads (profile photo, CNIC, family documents, and more).
-- **Status management** — Toggle employee status (e.g. Active / Deactive) with validation aligned to database constraints.
+- **Status management** — Toggle employee status (e.g. Active / Un-Active) with validation aligned to database constraints.
 - **Configuration** — Maintain **Departments** and **Sections** with usage counts, safe deletion when no employees reference a value, and quick access to employees per department or section.
 - **Detail views** — Modal-based employee detail view with tabs and optional navigation to edit mode.
 - **Responsive UI** — Dashboard shell with sidebar navigation, top bar, and a polished dark-mode–friendly interface (Tailwind CSS).

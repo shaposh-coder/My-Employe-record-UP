@@ -960,15 +960,14 @@ export function DepartmentSectionSettings() {
     item: { title: string; description: string },
   ) {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("departments")
-      .update({
-        title: item.title,
-        description: item.description,
-      })
-      .eq("id", id)
-      .select()
-      .single();
+    const { data: employeesUpdated, error } = await supabase.rpc(
+      "apply_department_update_sync_employees",
+      {
+        p_id: id,
+        p_new_title: item.title,
+        p_new_description: item.description,
+      },
+    );
     if (error) {
       if (error.code === "23505") {
         toast.error("Duplicate title", {
@@ -982,9 +981,21 @@ export function DepartmentSectionSettings() {
       }
       throw error;
     }
+    const n =
+      typeof employeesUpdated === "number" ? employeesUpdated : Number(employeesUpdated ?? 0);
+    toast.success("Department saved", {
+      description:
+        n > 0
+          ? `Updated ${n} employee record(s) to use the new department name.`
+          : undefined,
+    });
     setDepartments((prev) =>
       prev
-        .map((row) => (row.id === id ? (data as DirectoryItem) : row))
+        .map((row) =>
+          row.id === id
+            ? { ...row, title: item.title, description: item.description }
+            : row,
+        )
         .sort(sortByTitle),
     );
     void loadDirectorySnapshot();
@@ -995,15 +1006,14 @@ export function DepartmentSectionSettings() {
     item: { title: string; description: string },
   ) {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("sections")
-      .update({
-        title: item.title,
-        description: item.description,
-      })
-      .eq("id", id)
-      .select()
-      .single();
+    const { data: employeesUpdated, error } = await supabase.rpc(
+      "apply_section_update_sync_employees",
+      {
+        p_id: id,
+        p_new_title: item.title,
+        p_new_description: item.description,
+      },
+    );
     if (error) {
       if (error.code === "23505") {
         toast.error("Duplicate title", {
@@ -1015,9 +1025,21 @@ export function DepartmentSectionSettings() {
       }
       throw error;
     }
+    const n =
+      typeof employeesUpdated === "number" ? employeesUpdated : Number(employeesUpdated ?? 0);
+    toast.success("Section saved", {
+      description:
+        n > 0
+          ? `Updated ${n} employee record(s) to use the new section name.`
+          : undefined,
+    });
     setSections((prev) =>
       prev
-        .map((row) => (row.id === id ? (data as DirectoryItem) : row))
+        .map((row) =>
+          row.id === id
+            ? { ...row, title: item.title, description: item.description }
+            : row,
+        )
         .sort(sortByTitle),
     );
     void loadDirectorySnapshot();

@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useState,
 } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useUserAccess } from "@/components/dashboard/user-access-context";
 import { useTopbarEndSlot } from "@/components/dashboard/topbar-slot-context";
@@ -30,9 +32,22 @@ import {
   EMPLOYEES_PAGE_SIZE_OPTIONS,
   type EmployeesPageSize,
   fetchEmployees,
+  parseEmployeesStatusQueryParam,
 } from "@/lib/fetch-employees";
+import { EMPLOYEE_STATUS } from "@/lib/employee-status";
+import { defaultColumnVisibility } from "@/lib/employee-table-columns";
 
-export default function EmployeesPage() {
+function EmployeesPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusFilter = useMemo(
+    () => parseEmployeesStatusQueryParam(searchParams.get("status")),
+    [searchParams],
+  );
+
+  const departmentParam = searchParams.get("department") ?? "";
+  const sectionParam = searchParams.get("section") ?? "";
+
   const { role } = useUserAccess();
   const readOnly = role === "viewer";
   const { setEndSlot } = useTopbarEndSlot();
@@ -70,8 +85,13 @@ export default function EmployeesPage() {
   }, [searchInput]);
 
   useEffect(() => {
+    setDepartment(departmentParam);
+    setSection(sectionParam);
+  }, [departmentParam, sectionParam]);
+
+  useEffect(() => {
     setPage(1);
-  }, [debouncedSearch]);
+  }, [debouncedSearch, statusFilter, departmentParam, sectionParam]);
 
   /** If the result set shrinks (filters, deletes), avoid staying past the last page. */
   useEffect(() => {
@@ -85,8 +105,9 @@ export default function EmployeesPage() {
       department: department.trim() || undefined,
       section: section.trim() || undefined,
       city: city.trim() || undefined,
+      status: statusFilter || undefined,
     }),
-    [debouncedSearch, department, section, city],
+    [debouncedSearch, department, section, city, statusFilter],
   );
 
   const hasActiveFilters = useMemo(
@@ -95,15 +116,17 @@ export default function EmployeesPage() {
         debouncedSearch.trim() ||
           department.trim() ||
           section.trim() ||
-          city.trim(),
+          city.trim() ||
+          statusFilter,
       ),
-    [debouncedSearch, department, section, city],
+    [debouncedSearch, department, section, city, statusFilter],
   );
 
   const activeFilterCount = useMemo(
     () =>
-      [department, section, city].filter((v) => v.trim() !== "").length,
-    [department, section, city],
+      [department, section, city].filter((v) => v.trim() !== "").length +
+      (statusFilter ? 1 : 0),
+    [department, section, city, statusFilter],
   );
 
   useEffect(() => {
@@ -196,7 +219,8 @@ export default function EmployeesPage() {
   const handleToggleStatus = useCallback(
     async (row: EmployeeListRow) => {
       const current = row.status ?? "Active";
-      const next = current === "Active" ? "Deactive" : "Active";
+      const next =
+        current === "Active" ? EMPLOYEE_STATUS.UnActive : EMPLOYEE_STATUS.Active;
       setStatusUpdatingId(row.id);
       try {
         const supabase = createClient();
@@ -211,9 +235,9 @@ export default function EmployeesPage() {
           return;
         }
         toast.success(
-          next === "Active"
+          next === EMPLOYEE_STATUS.Active
             ? "Employee is now Active"
-            : "Employee is now Deactive",
+            : "Employee is now Un-Active",
         );
         void loadRows();
       } finally {
@@ -235,7 +259,8 @@ export default function EmployeesPage() {
     setSection("");
     setCity("");
     setPage(1);
-  }, []);
+    router.replace("/employees", { scroll: false });
+  }, [router]);
 
   const handleDepartmentChange = useCallback((v: string) => {
     setDepartment(v);
@@ -377,5 +402,27 @@ export default function EmployeesPage() {
         canEdit={!readOnly}
       />
     </div>
+  );
+}
+
+export default function EmployeesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+            <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl">
+              <EmployeesTableSkeleton
+                visibility={defaultColumnVisibility()}
+                rowCount={DEFAULT_EMPLOYEES_PAGE_SIZE}
+                embedInCard
+              />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <EmployeesPageContent />
+    </Suspense>
   );
 }

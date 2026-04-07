@@ -90,7 +90,7 @@ function columnMinClass(colId: EmployeeColumnId): string {
     case "action":
       return "min-w-[3.25rem]";
     case "status":
-      return "min-w-[6.5rem]";
+      return "min-w-[8rem]";
     default:
       return "min-w-[150px]";
   }
@@ -272,7 +272,7 @@ export function EmployeesTable({
   visibility: Record<EmployeeColumnId, boolean>;
   onDelete: (id: string) => void | Promise<void>;
   onEmployeeNameClick?: (id: string) => void;
-  /** Toggle between Active and Deactive (database constraint). */
+  /** Toggle between Active and Un-Active (database constraint). */
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   /** When set, the status button for this row shows a spinner. */
   statusUpdatingId?: string | null;

@@ -1,6 +1,14 @@
 import type { EmployeeListRow } from "@/components/employees/employee-list-row";
 import { createClient } from "@/lib/supabase/client";
 import { employeeListRowFromDbRow } from "@/lib/employee-list-row-from-db";
+import {
+  EMPLOYEE_STATUS,
+  type EmployeeStoredStatus,
+  parseEmployeesStatusQueryParam,
+} from "@/lib/employee-status";
+
+export type { EmployeeStoredStatus };
+export { parseEmployeesStatusQueryParam };
 
 const SELECT_COLUMNS =
   "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, phone_no, city, department, section, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt, status";
@@ -22,6 +30,8 @@ export type FetchEmployeesOptions = {
   department?: string;
   section?: string;
   city?: string;
+  /** When set, only rows with this `employees.status` (Active / Un-Active). */
+  status?: EmployeeStoredStatus;
 };
 
 /** Strip characters that break PostgREST `or()` filter strings. */
@@ -94,6 +104,11 @@ export async function fetchEmployees(
 
     const city = options?.city?.trim();
     if (city) query = query.eq("city", city);
+
+    const st = options?.status;
+    if (st === EMPLOYEE_STATUS.Active || st === EMPLOYEE_STATUS.UnActive) {
+      query = query.eq("status", st);
+    }
 
     const { data, error, count } = await query.range(from, to);
     if (error) return { rows: [], total: 0, error: error.message };

@@ -26,6 +26,6 @@ export type EmployeeListRow = {
   family_cnic: string | null;
   family_phone: string | null;
   family_phone_alt: string | null;
-  /** Active or Deactive — from Add Employee form */
+  /** Active or Un-Active — from Add Employee form */
   status: string | null;
 };
