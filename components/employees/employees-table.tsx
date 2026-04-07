@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import {
   ensureFixedColumnVisibility,
   type EmployeeColumnId,
@@ -267,6 +268,8 @@ export function EmployeesTable({
   readOnly = false,
   /** When true, no outer card border/radius — use inside a parent card with a footer. */
   embedInCard = false,
+  /** First fetch in progress with no rows yet — avoids flashing “no employees” under the loading overlay. */
+  directoryLoading = false,
 }: {
   rows: EmployeeListRow[];
   visibility: Record<EmployeeColumnId, boolean>;
@@ -278,6 +281,7 @@ export function EmployeesTable({
   statusUpdatingId?: string | null;
   readOnly?: boolean;
   embedInCard?: boolean;
+  directoryLoading?: boolean;
 }) {
   const defs = buildColumnDefs(
     onDelete,
@@ -336,7 +340,15 @@ export function EmployeesTable({
                   colSpan={colCount}
                   className="whitespace-normal px-6 py-12 text-center text-slate-500 dark:text-slate-400"
                 >
-                {readOnly ? (
+                {directoryLoading ? (
+                  <span className="inline-flex items-center justify-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                    <Loader2
+                      className="h-5 w-5 shrink-0 animate-spin text-slate-500 dark:text-slate-400"
+                      aria-hidden
+                    />
+                    Loading employees…
+                  </span>
+                ) : readOnly ? (
                   "No employees match your filters."
                 ) : (
                   <>

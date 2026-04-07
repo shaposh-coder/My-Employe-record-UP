@@ -47,6 +47,7 @@ function EmployeesPageContent() {
 
   const departmentParam = searchParams.get("department") ?? "";
   const sectionParam = searchParams.get("section") ?? "";
+  const cityParam = searchParams.get("city") ?? "";
 
   const { role } = useUserAccess();
   const readOnly = role === "viewer";
@@ -56,8 +57,7 @@ function EmployeesPageContent() {
     useState<EmployeesPageSize>(DEFAULT_EMPLOYEES_PAGE_SIZE);
   const [rows, setRows] = useState<EmployeeListRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [ready, setReady] = useState(false);
-  const [listLoading, setListLoading] = useState(false);
+  const [listLoading, setListLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(
     null,
@@ -69,9 +69,14 @@ function EmployeesPageContent() {
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [department, setDepartment] = useState("");
-  const [section, setSection] = useState("");
-  const [city, setCity] = useState("");
+  /** Seed from URL on first paint so the first fetch matches dashboard/deep links (no extra unfiltered round-trip). */
+  const [department, setDepartment] = useState(
+    () => searchParams.get("department") ?? "",
+  );
+  const [section, setSection] = useState(
+    () => searchParams.get("section") ?? "",
+  );
+  const [city, setCity] = useState(() => searchParams.get("city") ?? "");
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
   const [sectionOptions, setSectionOptions] = useState<string[]>([]);
   const [cityOptions, setCityOptions] = useState<string[]>([]);
@@ -87,7 +92,8 @@ function EmployeesPageContent() {
   useEffect(() => {
     setDepartment(departmentParam);
     setSection(sectionParam);
-  }, [departmentParam, sectionParam]);
+    setCity(cityParam);
+  }, [departmentParam, sectionParam, cityParam]);
 
   useEffect(() => {
     setPage(1);
@@ -163,7 +169,6 @@ function EmployeesPageContent() {
     void loadRows().then(() => {
       if (!cancelled) {
         setListLoading(false);
-        setReady(true);
       }
     });
     return () => {
@@ -356,45 +361,34 @@ function EmployeesPageContent() {
         </p>
       ) : null}
 
-      {!ready ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-          <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl">
-            <EmployeesTableSkeleton
-              visibility={visibility}
-              rowCount={pageSize}
-              embedInCard
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-          <div
-            className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl"
-            aria-busy={listLoading}
-          >
-            <EmployeesTableLoadingOverlay active={listLoading} />
-            <EmployeesTable
-              embedInCard
-              readOnly={readOnly}
-              rows={rows}
-              visibility={visibility}
-              onDelete={handleDelete}
-              onEmployeeNameClick={openEmployeeDetail}
-              onToggleStatus={handleToggleStatus}
-              statusUpdatingId={statusUpdatingId}
-            />
-          </div>
-          <EmployeesPagination
-            page={page}
-            pageSize={pageSize}
-            pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
-            total={totalCount}
-            disabled={listLoading}
-            onPageChange={setPage}
-            onPageSizeChange={handlePageSizeChange}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+        <div
+          className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl"
+          aria-busy={listLoading}
+        >
+          <EmployeesTableLoadingOverlay active={listLoading} />
+          <EmployeesTable
+            embedInCard
+            readOnly={readOnly}
+            rows={rows}
+            visibility={visibility}
+            directoryLoading={listLoading && rows.length === 0}
+            onDelete={handleDelete}
+            onEmployeeNameClick={openEmployeeDetail}
+            onToggleStatus={handleToggleStatus}
+            statusUpdatingId={statusUpdatingId}
           />
         </div>
-      )}
+        <EmployeesPagination
+          page={page}
+          pageSize={pageSize}
+          pageSizeOptions={EMPLOYEES_PAGE_SIZE_OPTIONS}
+          total={totalCount}
+          disabled={listLoading}
+          onPageChange={setPage}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      </div>
 
       <EmployeeDetailModal
         employeeId={detailEmployeeId}

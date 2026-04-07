@@ -84,6 +84,7 @@ function BreakdownTable({
                   <td className={tdPad}>
                     <Link
                       href={hrefName}
+                      prefetch
                       className={linkName}
                       title={`Employees in ${row.title} (${labelSuffix})`}
                     >
@@ -93,6 +94,7 @@ function BreakdownTable({
                   <td className={tdPad}>
                     <Link
                       href={hrefActive}
+                      prefetch
                       className={linkNum}
                       title={`Active employees — ${row.title}`}
                     >
@@ -102,6 +104,7 @@ function BreakdownTable({
                   <td className={tdPad}>
                     <Link
                       href={hrefUnActive}
+                      prefetch
                       className={linkNum}
                       title={`Un-Active employees — ${row.title}`}
                     >

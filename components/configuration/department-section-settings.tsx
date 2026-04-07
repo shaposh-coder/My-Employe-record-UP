@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -11,7 +10,10 @@ import {
 } from "react";
 import {
   AlertTriangle,
+  Building2,
+  ChevronRight,
   Eye,
+  Layers,
   Loader2,
   Pencil,
   Plus,
@@ -601,30 +603,68 @@ function DepartmentsWithNestedSections({
               ?.title ?? "Department"
           }`;
 
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (filteredDepartments.length === 0) {
+      setSelectedDeptId(null);
+      return;
+    }
+    setSelectedDeptId((prev) => {
+      if (prev && filteredDepartments.some((d) => d.id === prev)) return prev;
+      return filteredDepartments[0].id;
+    });
+  }, [filteredDepartments]);
+
+  const selectedDept = useMemo(
+    () => filteredDepartments.find((d) => d.id === selectedDeptId) ?? null,
+    [filteredDepartments, selectedDeptId],
+  );
+
+  const selectedDeptSecList = selectedDept
+    ? sectionsVisibleForDepartment(selectedDept)
+    : [];
+
+  const selectedDeptMeta = useMemo(() => {
+    if (!selectedDept) return null;
+    const dn = deptCounts[selectedDept.id] ?? 0;
+    const deptDeleteBlocked = dn > 0;
+    const childHasEmployees = sections
+      .filter((s) => s.department_id === selectedDept.id)
+      .some((s) => (secCounts[s.id] ?? 0) > 0);
+    const canDeleteDept = !deptDeleteBlocked && !childHasEmployees;
+    return { dn, deptDeleteBlocked, childHasEmployees, canDeleteDept };
+  }, [selectedDept, deptCounts, sections, secCounts]);
+
   return (
-    <section className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
-        <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          Departments &amp; sections
-        </h2>
+    <section className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/30 ring-1 ring-slate-900/[0.03] dark:border-slate-700/70 dark:bg-slate-900 dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.04]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100/80 bg-gradient-to-r from-violet-50/90 via-white to-fuchsia-50/70 px-4 py-4 sm:px-6 dark:border-violet-950/40 dark:from-violet-950/35 dark:via-slate-900 dark:to-fuchsia-950/25">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+            Departments &amp; sections
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+            Choose a department, then add or edit its sections
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setDeptAddOpen(true)}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-medium text-white shadow-md shadow-violet-500/25 transition hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-lg dark:shadow-violet-900/40"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
           Add department
         </button>
       </div>
 
-      <div className="border-b border-slate-100 p-3 dark:border-slate-800" role="search">
+      <div className="border-b border-slate-100 p-3 dark:border-slate-800 sm:px-6" role="search">
         <label htmlFor="search-departments-sections" className="sr-only">
           Search departments and sections
         </label>
-        <div className="flex h-11 min-w-0 items-stretch overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm ring-slate-200/60 transition focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-200/70 dark:border-slate-600 dark:bg-slate-800/80 dark:ring-slate-700/40 dark:focus-within:border-slate-500 dark:focus-within:ring-slate-600/35">
+        <div className="flex h-11 min-w-0 items-stretch overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm ring-violet-200/40 transition focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-200/60 dark:border-slate-600 dark:bg-slate-800/80 dark:ring-violet-900/30 dark:focus-within:border-violet-500/60 dark:focus-within:ring-violet-600/25">
           <div className="relative flex min-w-0 flex-1 items-center">
             <Search
-              className="pointer-events-none absolute left-3 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
+              className="pointer-events-none absolute left-3 h-4 w-4 shrink-0 text-violet-400 dark:text-violet-500/80"
               strokeWidth={2}
               aria-hidden
             />
@@ -689,279 +729,292 @@ function DepartmentsWithNestedSections({
         }}
       />
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[min(100%,28rem)] border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
-              <th
-                scope="col"
-                className="whitespace-nowrap px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-              >
-                Department
-              </th>
-              <th
-                scope="col"
-                className="min-w-[6rem] px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-              >
-                Description
-              </th>
-              <th
-                scope="col"
-                className="w-[1%] whitespace-nowrap px-3 py-2.5 text-right text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
-              >
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="flex min-h-[min(28rem,70vh)] flex-col lg:min-h-[min(22rem,65vh)] lg:flex-row">
+        <aside
+          className="border-b border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white dark:border-slate-800 dark:from-slate-950/80 dark:to-slate-900 lg:w-[min(100%,17.5rem)] lg:shrink-0 lg:border-b-0 lg:border-r"
+          aria-label="Departments"
+        >
+          <div className="sticky top-0 max-h-[min(40vh,16rem)] overflow-y-auto p-3 sm:p-4 lg:max-h-none">
+            <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-widest text-violet-600/90 dark:text-violet-400/90">
+              <Building2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+              Departments
+            </p>
             {departments.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-3 py-6 text-center text-sm font-medium text-slate-500 dark:text-slate-400"
-                >
-                  No departments yet — click Add department to create one.
-                </td>
-              </tr>
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+                No departments yet — use{" "}
+                <span className="font-semibold text-violet-600 dark:text-violet-400">
+                  Add department
+                </span>
+              </p>
             ) : filteredDepartments.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-3 py-6 text-center text-sm font-medium text-slate-500 dark:text-slate-400"
-                >
-                  No matches for your search.
-                </td>
-              </tr>
+              <p className="rounded-2xl border border-dashed border-amber-200/80 bg-amber-50/50 px-3 py-6 text-center text-sm text-amber-900/80 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100/90">
+                No matches — try another search.
+              </p>
             ) : (
-              filteredDepartments.map((dept) => {
-                const dn = deptCounts[dept.id] ?? 0;
-                const deptDeleteBlocked = dn > 0;
-                const secList = sectionsVisibleForDepartment(dept);
-                return (
-                  <Fragment key={dept.id}>
-                    <tr
-                      className="border-b border-slate-50 text-sm font-semibold dark:border-slate-800/80"
-                    >
-                      <td className="max-w-[min(16rem,50vw)] px-3 py-2 align-middle">
-                        <button
-                          type="button"
-                          onClick={() => onShowDeptEmployees(dept)}
-                          className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
-                          title="View employees assigned to this department"
+              <ul className="flex flex-row gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:pb-0">
+                {filteredDepartments.map((dept) => {
+                  const isActive = dept.id === selectedDeptId;
+                  return (
+                    <li key={dept.id} className="shrink-0 lg:shrink">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDeptId(dept.id)}
+                        aria-current={isActive ? "true" : undefined}
+                        className={[
+                          "flex w-full min-w-[10.5rem] items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition lg:min-w-0",
+                          isActive
+                            ? "border-violet-300/90 bg-gradient-to-r from-violet-500/[0.12] to-fuchsia-500/[0.08] shadow-sm shadow-violet-500/10 dark:border-violet-500/40 dark:from-violet-500/20 dark:to-fuchsia-500/10 dark:shadow-violet-900/30"
+                            : "border-transparent bg-white/70 hover:border-violet-200/80 hover:bg-violet-50/50 dark:bg-slate-900/40 dark:hover:border-violet-800/60 dark:hover:bg-violet-950/40",
+                        ].join(" ")}
+                      >
+                        <span
+                          className={[
+                            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold",
+                            isActive
+                              ? "bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-md"
+                              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+                          ].join(" ")}
                         >
-                          <span className="font-bold text-slate-900 underline-offset-2 group-hover:underline dark:text-slate-100">
+                          {dept.title.trim().charAt(0).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-slate-900 dark:text-slate-100">
                             {dept.title}
                           </span>
-                          <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
-                            ({dn})
-                          </span>
+                        </span>
+                        <ChevronRight
+                          className={[
+                            "h-4 w-4 shrink-0 text-violet-400 transition dark:text-violet-500/80",
+                            isActive ? "opacity-100" : "opacity-40",
+                          ].join(" ")}
+                          strokeWidth={2}
+                          aria-hidden
+                        />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+        <div className="min-h-[12rem] flex-1 bg-gradient-to-br from-white via-violet-50/[0.35] to-fuchsia-50/30 p-4 sm:p-6 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/20">
+          {!selectedDept ? (
+            <div className="flex h-full min-h-[14rem] flex-col items-center justify-center rounded-3xl border border-dashed border-violet-200/60 bg-white/50 px-6 text-center dark:border-violet-900/40 dark:bg-slate-900/30">
+              <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-100 to-fuchsia-100 text-2xl dark:from-violet-900/50 dark:to-fuchsia-900/40">
+                <Layers className="h-7 w-7 text-violet-600 dark:text-violet-400" strokeWidth={1.75} aria-hidden />
+              </div>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                Select a department
+              </p>
+              <p className="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-500">
+                Sections for that department show up here — like a submenu.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {selectedDept && selectedDeptMeta ? (
+                  <div className="rounded-3xl border border-violet-100/70 bg-white/90 p-4 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/70 sm:p-5">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-800 dark:bg-violet-500/25 dark:text-violet-200">
+                          Department
+                        </span>
+                        <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+                          {selectedDept.title}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => onShowDeptEmployees(selectedDept)}
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-violet-100 hover:text-violet-900 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-violet-950/60 dark:hover:text-violet-100"
+                        >
+                          <Eye className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                          View employees ({selectedDeptMeta.dn})
                         </button>
-                      </td>
-                      <td className="max-w-[min(14rem,35vw)] px-3 py-2 align-middle font-medium text-slate-700 dark:text-slate-300">
-                        {dept.description ? (
-                          <span className="line-clamp-2 font-semibold">
-                            {dept.description}
-                          </span>
-                        ) : (
-                          <span className="font-semibold text-slate-400 dark:text-slate-500">
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
-                        <div className="inline-flex items-center justify-end gap-0.5">
-                          <button
-                            type="button"
-                            disabled={deptDeleteBlocked}
-                            title={
-                              deptDeleteBlocked
-                                ? `${dn} employee(s) assigned — remove assignments first`
-                                : "Delete"
-                            }
-                            onClick={() => {
-                              if (deptDeleteBlocked) return;
-                              const ok = window.confirm(
-                                `Delete “${dept.title}” and all its sections? This cannot be undone.`,
-                              );
-                              if (ok) void onDeleteDepartment(dept.id);
-                            }}
-                            className={[
-                              "rounded-md p-1.5 transition",
-                              deptDeleteBlocked
-                                ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
-                                : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
-                            ].join(" ")}
-                            aria-label={`Delete ${dept.title}`}
-                            aria-disabled={deptDeleteBlocked}
+                      </div>
+                      <div className="flex shrink-0 gap-2 self-end sm:self-start">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeptEditState({
+                              id: selectedDept.id,
+                              item: selectedDept,
+                            })
+                          }
+                          className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-violet-700 dark:hover:bg-violet-950/50"
+                        >
+                          <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!selectedDeptMeta.canDeleteDept}
+                          title={
+                            selectedDeptMeta.deptDeleteBlocked
+                              ? `${selectedDeptMeta.dn} employee(s) on this department`
+                              : selectedDeptMeta.childHasEmployees
+                                ? "A section still has employees"
+                                : "Delete department"
+                          }
+                          onClick={() => {
+                            if (!selectedDeptMeta.canDeleteDept) return;
+                            const ok = window.confirm(
+                              `Delete “${selectedDept.title}” and all its sections? This cannot be undone.`,
+                            );
+                            if (ok) void onDeleteDepartment(selectedDept.id);
+                          }}
+                          className={[
+                            "inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition",
+                            !selectedDeptMeta.canDeleteDept
+                              ? "cursor-not-allowed border border-slate-100 text-slate-300 opacity-60 dark:border-slate-800 dark:text-slate-600"
+                              : "border border-red-200/80 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70",
+                          ].join(" ")}
+                        >
+                          <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+              ) : null}
+
+              <div className="overflow-hidden rounded-3xl border border-violet-200/50 bg-gradient-to-br from-violet-50/40 via-white to-fuchsia-50/30 shadow-inner shadow-violet-100/50 dark:border-violet-900/40 dark:from-violet-950/30 dark:via-slate-900/90 dark:to-fuchsia-950/20 dark:shadow-none">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100/60 px-4 py-3 dark:border-violet-900/40 sm:px-5">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-md">
+                      <Layers className="h-4 w-4" strokeWidth={2} aria-hidden />
+                    </span>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                        Sections
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Under this department
+                      </p>
+                    </div>
+                    <span className="ml-1 rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold tabular-nums text-violet-700 shadow-sm dark:bg-violet-950/80 dark:text-violet-200">
+                      {selectedDeptSecList.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      selectedDept &&
+                      setSectionForm({
+                        mode: "add",
+                        departmentId: selectedDept.id,
+                      })
+                    }
+                    disabled={!selectedDept}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-white px-3 text-xs font-semibold text-violet-700 shadow-sm ring-1 ring-violet-200/80 transition hover:bg-violet-50 disabled:opacity-50 dark:bg-violet-950/50 dark:text-violet-200 dark:ring-violet-800/60 dark:hover:bg-violet-900/60"
+                  >
+                    <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                    Add section
+                  </button>
+                </div>
+
+                <div className="p-4 sm:p-5">
+                  {selectedDeptSecList.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-violet-200/70 bg-white/60 px-4 py-10 text-center dark:border-violet-900/50 dark:bg-slate-900/40">
+                      <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                        No sections yet — add one to get started
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          selectedDept &&
+                          setSectionForm({
+                            mode: "add",
+                            departmentId: selectedDept.id,
+                          })
+                        }
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition hover:opacity-95"
+                      >
+                        <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                        Add first section
+                      </button>
+                    </div>
+                  ) : (
+                    <ul className="space-y-2.5">
+                      {selectedDeptSecList.map((item) => {
+                        const n = secCounts[item.id] ?? 0;
+                        const deleteBlocked = n > 0;
+                        return (
+                          <li
+                            key={item.id}
+                            className="group flex flex-col gap-0 rounded-2xl border border-slate-100/90 bg-white/95 shadow-sm transition hover:border-violet-200 hover:shadow-md dark:border-slate-700/80 dark:bg-slate-800/60 dark:hover:border-violet-800/70 sm:flex-row sm:items-stretch"
                           >
-                            <Trash2
-                              className="h-4 w-4"
-                              strokeWidth={2}
-                              aria-hidden
-                            />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setDeptEditState({ id: dept.id, item: dept })
-                            }
-                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                            aria-label={`Edit ${dept.title}`}
-                            title="Edit"
-                          >
-                            <Pencil
-                              className="h-4 w-4"
-                              strokeWidth={2}
-                              aria-hidden
-                            />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <td colSpan={3} className="bg-slate-50/50 px-0 py-0 dark:bg-slate-950/40">
-                        <div className="border-l-2 border-slate-200 px-3 py-3 pl-5 dark:border-slate-600">
-                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                              Sections
-                            </p>
                             <button
                               type="button"
-                              onClick={() =>
-                                setSectionForm({
-                                  mode: "add",
-                                  departmentId: dept.id,
-                                })
-                              }
-                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                              onClick={() => onShowSecEmployees(item)}
+                              className="min-w-0 flex-1 cursor-pointer rounded-2xl rounded-b-none border-0 bg-transparent p-3.5 text-left outline-none transition hover:bg-violet-50/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-400/80 dark:hover:bg-violet-950/25 dark:focus-visible:ring-violet-500/50 sm:rounded-l-2xl sm:rounded-r-none sm:py-3.5"
+                              aria-label={`View employees in ${item.title}`}
                             >
-                              <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                              Add section
+                              <div>
+                                <span className="font-bold text-slate-900 dark:text-slate-50">
+                                  {item.title}
+                                </span>
+                                <span className="ml-2 tabular-nums text-sm font-semibold text-violet-600 dark:text-violet-400">
+                                  ({n})
+                                </span>
+                              </div>
+                              <p className="mt-0.5 line-clamp-2 text-sm text-slate-600 dark:text-slate-400">
+                                {item.description?.trim()
+                                  ? item.description
+                                  : "—"}
+                              </p>
                             </button>
-                          </div>
-                          {secList.length === 0 ? (
-                            <p className="py-2 text-sm font-medium text-slate-500 dark:text-slate-400">
-                              No sections for this department yet.
-                            </p>
-                          ) : (
-                            <table className="w-full border-collapse text-left text-sm">
-                              <thead>
-                                <tr className="border-b border-slate-200/90 dark:border-slate-700">
-                                  <th className="py-1.5 pr-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    Name
-                                  </th>
-                                  <th className="py-1.5 pr-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    Description
-                                  </th>
-                                  <th className="w-[1%] py-1.5 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                    Action
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {secList.map((item) => {
-                                  const n = secCounts[item.id] ?? 0;
-                                  const deleteBlocked = n > 0;
-                                  return (
-                                    <tr
-                                      key={item.id}
-                                      className="border-b border-slate-100/90 last:border-0 dark:border-slate-800/80"
-                                    >
-                                      <td className="max-w-[min(14rem,45vw)] py-2 pr-2 align-middle">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            onShowSecEmployees(item)
-                                          }
-                                          className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
-                                          title="View employees assigned to this section"
-                                        >
-                                          <span className="font-bold text-slate-800 underline-offset-2 group-hover:underline dark:text-slate-100">
-                                            {item.title}
-                                          </span>
-                                          <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
-                                            ({n})
-                                          </span>
-                                        </button>
-                                      </td>
-                                      <td className="max-w-[min(12rem,35vw)] py-2 pr-2 align-middle text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        {item.description ? (
-                                          <span className="line-clamp-2 font-semibold">
-                                            {item.description}
-                                          </span>
-                                        ) : (
-                                          <span className="font-semibold text-slate-400 dark:text-slate-500">
-                                            —
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="whitespace-nowrap py-2 text-right align-middle">
-                                        <div className="inline-flex items-center justify-end gap-0.5">
-                                          <button
-                                            type="button"
-                                            disabled={deleteBlocked}
-                                            title={
-                                              deleteBlocked
-                                                ? `${n} employee(s) assigned — remove assignments first`
-                                                : "Delete"
-                                            }
-                                            onClick={() => {
-                                              if (deleteBlocked) return;
-                                              const ok = window.confirm(
-                                                `Delete “${item.title}”? This cannot be undone.`,
-                                              );
-                                              if (ok) void onDeleteSection(item.id);
-                                            }}
-                                            className={[
-                                              "rounded-md p-1.5 transition",
-                                              deleteBlocked
-                                                ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
-                                                : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
-                                            ].join(" ")}
-                                            aria-label={`Delete ${item.title}`}
-                                            aria-disabled={deleteBlocked}
-                                          >
-                                            <Trash2
-                                              className="h-4 w-4"
-                                              strokeWidth={2}
-                                              aria-hidden
-                                            />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              setSectionForm({
-                                                mode: "edit",
-                                                section: item,
-                                              })
-                                            }
-                                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                                            aria-label={`Edit ${item.title}`}
-                                            title="Edit"
-                                          >
-                                            <Pencil
-                                              className="h-4 w-4"
-                                              strokeWidth={2}
-                                              aria-hidden
-                                            />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
+                            <div className="flex shrink-0 items-center gap-1 border-t border-slate-100 p-2 dark:border-slate-700 sm:flex-col sm:justify-center sm:border-l sm:border-t-0 sm:p-2">
+                              <button
+                                type="button"
+                                disabled={deleteBlocked}
+                                title={
+                                  deleteBlocked
+                                    ? `${n} employee(s) assigned`
+                                    : "Delete"
+                                }
+                                onClick={() => {
+                                  if (deleteBlocked) return;
+                                  const ok = window.confirm(
+                                    `Delete “${item.title}”? This cannot be undone.`,
                                   );
-                                })}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  </Fragment>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                                  if (ok) void onDeleteSection(item.id);
+                                }}
+                                className={[
+                                  "rounded-xl p-2 transition",
+                                  deleteBlocked
+                                    ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
+                                    : "text-slate-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/50",
+                                ].join(" ")}
+                                aria-label={`Delete ${item.title}`}
+                              >
+                                <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSectionForm({
+                                    mode: "edit",
+                                    section: item,
+                                  })
+                                }
+                                className="rounded-xl p-2 text-slate-500 transition hover:bg-violet-50 hover:text-violet-800 dark:hover:bg-violet-950/50 dark:hover:text-violet-200"
+                                aria-label={`Edit ${item.title}`}
+                              >
+                                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
