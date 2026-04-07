@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { useUserAccess } from "@/components/dashboard/user-access-context";
 import { useTopbarEndSlot } from "@/components/dashboard/topbar-slot-context";
 import {
   EmployeesColumnPicker,
@@ -32,6 +33,8 @@ import {
 } from "@/lib/fetch-employees";
 
 export default function EmployeesPage() {
+  const { role } = useUserAccess();
+  const readOnly = role === "viewer";
   const { setEndSlot } = useTopbarEndSlot();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] =
@@ -279,13 +282,15 @@ export default function EmployeesPage() {
             visibility={visibility}
             onChange={setVisibility}
           />
-          <Link
-            href="/employees/new"
-            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white sm:px-4"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-            Add
-          </Link>
+          {readOnly ? null : (
+            <Link
+              href="/employees/new"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white sm:px-4"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+              Add
+            </Link>
+          )}
         </div>
       </>
     ),
@@ -306,6 +311,7 @@ export default function EmployeesPage() {
       handleCityChange,
       handleClearFilters,
       setVisibility,
+      readOnly,
     ],
   );
 
@@ -315,10 +321,10 @@ export default function EmployeesPage() {
   }, [employeesTopbarSlot, setEndSlot]);
 
   return (
-    <div>
+    <div className="flex min-h-0 w-full flex-1 flex-col">
       {loadError ? (
         <p
-          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+          className="mb-4 shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
           role="alert"
         >
           Could not load employees: {loadError}
@@ -326,20 +332,25 @@ export default function EmployeesPage() {
       ) : null}
 
       {!ready ? (
-        <EmployeesTableSkeleton
-          visibility={visibility}
-          rowCount={pageSize}
-          embedInCard={false}
-        />
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+          <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl">
+            <EmployeesTableSkeleton
+              visibility={visibility}
+              rowCount={pageSize}
+              embedInCard
+            />
+          </div>
+        </div>
       ) : (
-        <div className="flex max-h-[min(75vh,calc(100vh-12rem))] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
           <div
-            className="relative min-h-[min(50vh,24rem)] min-w-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl"
+            className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl"
             aria-busy={listLoading}
           >
             <EmployeesTableLoadingOverlay active={listLoading} />
             <EmployeesTable
               embedInCard
+              readOnly={readOnly}
               rows={rows}
               visibility={visibility}
               onDelete={handleDelete}
@@ -363,6 +374,7 @@ export default function EmployeesPage() {
       <EmployeeDetailModal
         employeeId={detailEmployeeId}
         onClose={() => setDetailEmployeeId(null)}
+        canEdit={!readOnly}
       />
     </div>
   );

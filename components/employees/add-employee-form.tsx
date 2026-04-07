@@ -12,6 +12,7 @@ import {
   type AddEmployeeFormValues,
 } from "@/lib/validations/add-employee-form";
 import { createClient } from "@/lib/supabase/client";
+import { AddEmployeeFormSkeleton } from "./add-employee-form-skeleton";
 import { EmployeeDocUploadField } from "./employee-doc-upload-field";
 import { SearchableCombobox } from "./searchable-combobox";
 import { SocialPlatformIcon } from "./social-platform-icons";
@@ -515,17 +516,24 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   if (loadingEmployee) {
     return (
       <div
-        className={`${inter.className} flex min-h-[240px] items-center justify-center gap-3 text-slate-600 dark:text-slate-400`}
+        className={`${inter.className} relative w-full min-w-0`}
+        aria-busy="true"
+        aria-label="Loading employee"
       >
-        <Loader2 className="h-8 w-8 shrink-0 animate-spin" aria-hidden />
-        <span className="text-sm">Loading employee…</span>
+        <AddEmployeeFormSkeleton />
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-6 sm:p-10">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white/90 px-3 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur-sm dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-300">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            Loading…
+          </span>
+        </div>
       </div>
     );
   }
 
   return (
     <div
-      className={`${inter.className} text-slate-900 antialiased dark:text-slate-100`}
+      className={`${inter.className} w-full min-w-0 text-slate-900 antialiased dark:text-slate-100`}
     >
       {submitError ? (
         <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
@@ -534,7 +542,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       ) : null}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-0">
-        <div className="flex h-[calc(100dvh-7.5rem)] min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+        <div className="flex h-[calc(100dvh-7.5rem)] min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
           <div
             role="tablist"
             aria-label="Employee form sections"
@@ -567,12 +575,13 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
 
           <div
             ref={tabScrollRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:p-10"
+            className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:p-10"
           >
             <div
               role="tabpanel"
               id="panel-personal"
               aria-labelledby="tab-personal"
+              className="w-full min-w-0"
               hidden={activeTab !== "personal"}
             >
               <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
@@ -771,6 +780,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
               role="tabpanel"
               id="panel-work"
               aria-labelledby="tab-work"
+              className="w-full min-w-0"
               hidden={activeTab !== "work"}
             >
               <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
@@ -872,10 +882,11 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
               role="tabpanel"
               id="panel-social"
               aria-labelledby="tab-social"
+              className="w-full min-w-0"
               hidden={activeTab !== "social"}
             >
-              <div className="flex flex-col gap-8">
-                <div className="max-w-xl">
+              <div className="flex w-full min-w-0 flex-col gap-8">
+                <div className="w-full min-w-0">
                   <label htmlFor="email_address" className={labelClass}>
                     Email address
                   </label>
@@ -945,6 +956,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
               role="tabpanel"
               id="panel-family"
               aria-labelledby="tab-family"
+              className="w-full min-w-0"
               hidden={activeTab !== "family"}
             >
               <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
@@ -1077,6 +1089,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
               role="tabpanel"
               id="panel-documents"
               aria-labelledby="tab-documents"
+              className="w-full min-w-0"
               hidden={activeTab !== "documents"}
             >
               <h2 className="mb-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">

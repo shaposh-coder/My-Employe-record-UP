@@ -139,9 +139,12 @@ function parseOtherDocs(raw: unknown): { url: string; label: string }[] {
 export function EmployeeDetailModal({
   employeeId,
   onClose,
+  /** When false, hide Edit (viewer / read-only). Default true for backward compatibility. */
+  canEdit = true,
 }: {
   employeeId: string | null;
   onClose: () => void;
+  canEdit?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("personal");
   const tabScrollRef = useRef<HTMLDivElement>(null);
@@ -253,14 +256,16 @@ export function EmployeeDetailModal({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href={`/employees/${employeeId}/edit`}
-              onClick={onClose}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
-              Edit
-            </Link>
+            {canEdit ? (
+              <Link
+                href={`/employees/${employeeId}/edit`}
+                onClick={onClose}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+                Edit
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={onClose}

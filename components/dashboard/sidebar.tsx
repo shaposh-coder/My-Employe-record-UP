@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { memo, useMemo } from "react";
+import { useUserAccess } from "./user-access-context";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -37,8 +39,27 @@ type SidebarProps = {
   onNavigate: () => void;
 };
 
-export function Sidebar({ mobileOpen, onNavigate }: SidebarProps) {
+function navVisibleForRole(
+  href: string,
+  role: "admin" | "manager" | "viewer",
+): boolean {
+  if (href === "/configuration") {
+    return role === "admin" || role === "manager";
+  }
+  if (href === "/settings") {
+    return role === "admin";
+  }
+  return true;
+}
+
+function SidebarComponent({ mobileOpen, onNavigate }: SidebarProps) {
   const pathname = usePathname();
+  const { role } = useUserAccess();
+
+  const navItems = useMemo(
+    () => nav.filter((item) => navVisibleForRole(item.href, role)),
+    [role],
+  );
 
   return (
     <aside
@@ -80,7 +101,7 @@ export function Sidebar({ mobileOpen, onNavigate }: SidebarProps) {
         className="flex flex-1 flex-col gap-1.5 p-4 pt-6"
         aria-label="Primary"
       >
-        {nav.map(({ href, label, icon: Icon }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const active = navItemActive(pathname, href);
           return (
             <Link
@@ -121,3 +142,5 @@ export function Sidebar({ mobileOpen, onNavigate }: SidebarProps) {
     </aside>
   );
 }
+
+export const Sidebar = memo(SidebarComponent);

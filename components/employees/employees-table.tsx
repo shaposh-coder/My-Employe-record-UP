@@ -263,6 +263,8 @@ export function EmployeesTable({
   onEmployeeNameClick,
   onToggleStatus,
   statusUpdatingId,
+  /** When true, hide row actions (viewer / read-only). */
+  readOnly = false,
   /** When true, no outer card border/radius — use inside a parent card with a footer. */
   embedInCard = false,
 }: {
@@ -274,6 +276,7 @@ export function EmployeesTable({
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   /** When set, the status button for this row shows a spinner. */
   statusUpdatingId?: string | null;
+  readOnly?: boolean;
   embedInCard?: boolean;
 }) {
   const defs = buildColumnDefs(
@@ -281,7 +284,7 @@ export function EmployeesTable({
     onEmployeeNameClick,
     onToggleStatus,
     statusUpdatingId,
-  );
+  ).filter((d) => !(readOnly && d.id === "action"));
   const effectiveVisibility = ensureFixedColumnVisibility(visibility);
   const filtered = defs.filter((d) => effectiveVisibility[d.id] === true);
   const visible =
@@ -333,11 +336,17 @@ export function EmployeesTable({
                   colSpan={colCount}
                   className="whitespace-normal px-6 py-12 text-center text-slate-500 dark:text-slate-400"
                 >
-                No employees yet. Use the{" "}
-                <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Add
-                </span>{" "}
-                button above.
+                {readOnly ? (
+                  "No employees match your filters."
+                ) : (
+                  <>
+                    No employees yet. Use the{" "}
+                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                      Add
+                    </span>{" "}
+                    button above.
+                  </>
+                )}
               </td>
             </tr>
           ) : (
