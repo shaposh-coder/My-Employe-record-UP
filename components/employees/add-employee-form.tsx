@@ -82,6 +82,8 @@ type TabId = (typeof TABS)[number]["id"];
 
 type ConfigOptionRow = { id: string; title: string };
 
+type SectionOptionRow = ConfigOptionRow & { department_id: string };
+
 type DocFieldKey =
   | "profile_image"
   | "cnic_front"
@@ -154,7 +156,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   const [activeTab, setActiveTab] = useState<TabId>("personal");
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const [departments, setDepartments] = useState<ConfigOptionRow[]>([]);
-  const [sections, setSections] = useState<ConfigOptionRow[]>([]);
+  const [sections, setSections] = useState<SectionOptionRow[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
 
@@ -177,6 +179,32 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
   const values = watch();
   const fatherName = watch("father_name");
   const cnicNo = watch("cnic_no");
+  const departmentValue = watch("department");
+  const sectionValue = watch("section");
+
+  const sectionOptionsForDepartment = useMemo(() => {
+    const dept = departments.find((d) => d.title === departmentValue);
+    if (!dept) return [];
+    return sections.filter((s) => s.department_id === dept.id);
+  }, [departments, departmentValue, sections]);
+
+  useEffect(() => {
+    if (configLoading) return;
+    if (!departmentValue?.trim()) {
+      if (sectionValue?.trim()) setValue("section", "");
+      return;
+    }
+    const valid =
+      !sectionValue?.trim() ||
+      sectionOptionsForDepartment.some((s) => s.title === sectionValue);
+    if (!valid) setValue("section", "");
+  }, [
+    configLoading,
+    departmentValue,
+    sectionValue,
+    sectionOptionsForDepartment,
+    setValue,
+  ]);
 
   const [cnicDuplicateBlocked, setCnicDuplicateBlocked] = useState(false);
   const [cnicLookupPending, setCnicLookupPending] = useState(false);
@@ -326,7 +354,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       setConfigError(null);
       const [dRes, sRes] = await Promise.all([
         supabase.from("departments").select("id, title").order("title"),
-        supabase.from("sections").select("id, title").order("title"),
+        supabase.from("sections").select("id, title, department_id").order("title"),
       ]);
       if (cancelled) return;
       if (dRes.error || sRes.error) {
@@ -337,7 +365,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
         setSections([]);
       } else {
         setDepartments((dRes.data as ConfigOptionRow[]) ?? []);
-        setSections((sRes.data as ConfigOptionRow[]) ?? []);
+        setSections((sRes.data as SectionOptionRow[]) ?? []);
       }
       setConfigLoading(false);
     }
@@ -838,14 +866,22 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
                     render={({ field }) => (
                       <SearchableCombobox
                         id="section"
-                        options={sections}
+                        options={sectionOptionsForDepartment}
                         value={field.value}
                         onChange={field.onChange}
                         onBlur={field.onBlur}
                         loading={configLoading}
-                        disabled={configLoading || sections.length === 0}
+                        disabled={
+                          configLoading ||
+                          !departmentValue?.trim() ||
+                          sectionOptionsForDepartment.length === 0
+                        }
                         inputClassName={inputClass}
-                        emptyMessage="No sections — add in Configuration"
+                        emptyMessage={
+                          !departmentValue?.trim()
+                            ? "Select a department first"
+                            : "No sections for this department — add in Configuration"
+                        }
                         searchPlaceholder="Search or select section"
                         aria-invalid={Boolean(errors.section)}
                       />

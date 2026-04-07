@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useId,
@@ -27,6 +28,10 @@ export type DirectoryItem = {
   id: string;
   title: string;
   description: string;
+};
+
+export type SectionItem = DirectoryItem & {
+  department_id: string;
 };
 
 /** Trim + collapse internal whitespace (so "  IT  " and "IT" match as duplicates). */
@@ -482,72 +487,139 @@ function ItemFormModal({
   );
 }
 
-function DirectoryPanel({
-  kind,
-  title,
-  items,
-  counts,
-  onAdd,
-  onUpdate,
-  onDelete,
-  onShowEmployees,
+function DepartmentsWithNestedSections({
+  departments,
+  sections,
+  deptCounts,
+  secCounts,
+  onAddDepartment,
+  onUpdateDepartment,
+  onDeleteDepartment,
+  onAddSection,
+  onUpdateSection,
+  onDeleteSection,
+  onShowDeptEmployees,
+  onShowSecEmployees,
 }: {
-  kind: "department" | "section";
-  title: string;
-  items: DirectoryItem[];
-  /** Employee counts keyed by directory row id. */
-  counts: Record<string, number>;
-  onAdd: (item: { title: string; description: string }) => void | Promise<void>;
-  onUpdate: (
+  departments: DirectoryItem[];
+  sections: SectionItem[];
+  deptCounts: Record<string, number>;
+  secCounts: Record<string, number>;
+  onAddDepartment: (item: {
+    title: string;
+    description: string;
+  }) => void | Promise<void>;
+  onUpdateDepartment: (
     id: string,
     item: { title: string; description: string },
   ) => void | Promise<void>;
-  onDelete: (id: string) => void | Promise<void>;
-  onShowEmployees: (item: DirectoryItem) => void;
+  onDeleteDepartment: (id: string) => void | Promise<void>;
+  onAddSection: (
+    departmentId: string,
+    item: { title: string; description: string },
+  ) => void | Promise<void>;
+  onUpdateSection: (
+    id: string,
+    item: { title: string; description: string },
+  ) => void | Promise<void>;
+  onDeleteSection: (id: string) => void | Promise<void>;
+  onShowDeptEmployees: (item: DirectoryItem) => void;
+  onShowSecEmployees: (item: DirectoryItem) => void;
 }) {
-  const [addOpen, setAddOpen] = useState(false);
+  const [deptAddOpen, setDeptAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editState, setEditState] = useState<{
+  const [deptEditState, setDeptEditState] = useState<{
     id: string;
     item: DirectoryItem;
   } | null>(null);
-  const addModalTitleId = useId();
-  const editTitleId = useId();
+  const [sectionForm, setSectionForm] = useState<
+    | { mode: "add"; departmentId: string }
+    | { mode: "edit"; section: SectionItem }
+    | null
+  >(null);
 
-  const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((it) => {
-      const t = it.title.toLowerCase();
-      const d = (it.description ?? "").toLowerCase();
-      return t.includes(q) || d.includes(q);
+  const deptAddModalTitleId = useId();
+  const deptEditTitleId = useId();
+  const sectionModalTitleId = useId();
+
+  const qLower = searchQuery.trim().toLowerCase();
+
+  const filteredDepartments = useMemo(() => {
+    if (!qLower) return departments;
+    return departments.filter((d) => {
+      const t = d.title.toLowerCase();
+      const desc = (d.description ?? "").toLowerCase();
+      if (t.includes(qLower) || desc.includes(qLower)) return true;
+      return sections.some((s) => {
+        if (s.department_id !== d.id) return false;
+        const st = s.title.toLowerCase();
+        const sd = (s.description ?? "").toLowerCase();
+        return st.includes(qLower) || sd.includes(qLower);
+      });
     });
-  }, [items, searchQuery]);
+  }, [departments, sections, qLower]);
+
+  function sectionsVisibleForDepartment(dept: DirectoryItem): SectionItem[] {
+    const list = sections
+      .filter((s) => s.department_id === dept.id)
+      .slice()
+      .sort(sortByTitle);
+    if (!qLower) return list;
+    const deptMatches =
+      dept.title.toLowerCase().includes(qLower) ||
+      (dept.description ?? "").toLowerCase().includes(qLower);
+    if (deptMatches) return list;
+    return list.filter((s) => {
+      const st = s.title.toLowerCase();
+      const sd = (s.description ?? "").toLowerCase();
+      return st.includes(qLower) || sd.includes(qLower);
+    });
+  }
+
+  const sectionModalItems = useMemo(() => {
+    if (sectionForm === null) return [];
+    const deptId =
+      sectionForm.mode === "add"
+        ? sectionForm.departmentId
+        : sectionForm.section.department_id;
+    return sections.filter((s) => s.department_id === deptId);
+  }, [sectionForm, sections]);
+
+  const sectionModalExcludeId =
+    sectionForm?.mode === "edit" ? sectionForm.section.id : null;
+
+  const sectionPanelLabel =
+    sectionForm === null
+      ? "Section"
+      : sectionForm.mode === "add"
+        ? `Section — ${
+            departments.find((d) => d.id === sectionForm.departmentId)
+              ?.title ?? "Department"
+          }`
+        : `Section — ${
+            departments.find((d) => d.id === sectionForm.section.department_id)
+              ?.title ?? "Department"
+          }`;
 
   return (
     <section className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
         <h2 className="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-          {title}
+          Departments &amp; sections
         </h2>
         <button
           type="button"
-          onClick={() => setAddOpen(true)}
+          onClick={() => setDeptAddOpen(true)}
           className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
         >
           <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-          Add
+          Add department
         </button>
       </div>
 
-      <div
-        className="border-b border-slate-100 p-3 dark:border-slate-800"
-        role="search"
-      >
-        <label htmlFor={`search-${kind}-${title}`} className="sr-only">
-          {kind === "department"
-            ? "Search departments"
-            : "Search sections"}
+      <div className="border-b border-slate-100 p-3 dark:border-slate-800" role="search">
+        <label htmlFor="search-departments-sections" className="sr-only">
+          Search departments and sections
         </label>
         <div className="flex h-11 min-w-0 items-stretch overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm ring-slate-200/60 transition focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-200/70 dark:border-slate-600 dark:bg-slate-800/80 dark:ring-slate-700/40 dark:focus-within:border-slate-500 dark:focus-within:ring-slate-600/35">
           <div className="relative flex min-w-0 flex-1 items-center">
@@ -557,11 +629,11 @@ function DirectoryPanel({
               aria-hidden
             />
             <input
-              id={`search-${kind}-${title}`}
+              id="search-departments-sections"
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or description…"
+              placeholder="Search departments or sections…"
               autoComplete="off"
               className="h-full min-w-0 flex-1 border-0 bg-transparent py-2 pl-10 pr-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
@@ -570,29 +642,50 @@ function DirectoryPanel({
       </div>
 
       <ItemFormModal
-        open={addOpen}
+        open={deptAddOpen}
         mode="add"
-        panelLabel={title}
-        titleId={addModalTitleId}
+        panelLabel="Department"
+        titleId={deptAddModalTitleId}
         initialItem={null}
-        items={items}
+        items={departments}
         excludeId={null}
-        onClose={() => setAddOpen(false)}
-        onSubmit={onAdd}
+        onClose={() => setDeptAddOpen(false)}
+        onSubmit={onAddDepartment}
       />
 
       <ItemFormModal
-        open={editState !== null}
+        open={deptEditState !== null}
         mode="edit"
-        panelLabel={title}
-        titleId={editTitleId}
-        initialItem={editState?.item ?? null}
-        items={items}
-        excludeId={editState?.id ?? null}
-        onClose={() => setEditState(null)}
+        panelLabel="Department"
+        titleId={deptEditTitleId}
+        initialItem={deptEditState?.item ?? null}
+        items={departments}
+        excludeId={deptEditState?.id ?? null}
+        onClose={() => setDeptEditState(null)}
         onSubmit={async (item) => {
-          if (editState === null) return;
-          await onUpdate(editState.id, item);
+          if (deptEditState === null) return;
+          await onUpdateDepartment(deptEditState.id, item);
+        }}
+      />
+
+      <ItemFormModal
+        open={sectionForm !== null}
+        mode={sectionForm?.mode === "edit" ? "edit" : "add"}
+        panelLabel={sectionPanelLabel}
+        titleId={sectionModalTitleId}
+        initialItem={
+          sectionForm?.mode === "edit" ? sectionForm.section : null
+        }
+        items={sectionModalItems}
+        excludeId={sectionModalExcludeId}
+        onClose={() => setSectionForm(null)}
+        onSubmit={async (item) => {
+          if (sectionForm === null) return;
+          if (sectionForm.mode === "add") {
+            await onAddSection(sectionForm.departmentId, item);
+          } else {
+            await onUpdateSection(sectionForm.section.id, item);
+          }
         }}
       />
 
@@ -604,7 +697,7 @@ function DirectoryPanel({
                 scope="col"
                 className="whitespace-nowrap px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300"
               >
-                Name
+                Department
               </th>
               <th
                 scope="col"
@@ -621,16 +714,16 @@ function DirectoryPanel({
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {departments.length === 0 ? (
               <tr>
                 <td
                   colSpan={3}
                   className="px-3 py-6 text-center text-sm font-medium text-slate-500 dark:text-slate-400"
                 >
-                  No rows yet — click Add to create one.
+                  No departments yet — click Add department to create one.
                 </td>
               </tr>
-            ) : filteredItems.length === 0 ? (
+            ) : filteredDepartments.length === 0 ? (
               <tr>
                 <td
                   colSpan={3}
@@ -640,82 +733,230 @@ function DirectoryPanel({
                 </td>
               </tr>
             ) : (
-              filteredItems.map((item) => {
-                const n = counts[item.id] ?? 0;
-                const deleteBlocked = n > 0;
+              filteredDepartments.map((dept) => {
+                const dn = deptCounts[dept.id] ?? 0;
+                const deptDeleteBlocked = dn > 0;
+                const secList = sectionsVisibleForDepartment(dept);
                 return (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-50 text-sm font-semibold last:border-0 dark:border-slate-800/80"
-                  >
-                    <td className="max-w-[min(16rem,50vw)] px-3 py-2 align-middle">
-                      <button
-                        type="button"
-                        onClick={() => onShowEmployees(item)}
-                        className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
-                        title="View employees assigned to this row"
-                      >
-                        <span className="font-bold text-slate-900 underline-offset-2 group-hover:underline dark:text-slate-100">
-                          {item.title}
-                        </span>
-                        <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
-                          ({n})
-                        </span>
-                      </button>
-                    </td>
-                    <td className="max-w-[min(14rem,35vw)] px-3 py-2 align-middle font-medium text-slate-700 dark:text-slate-300">
-                      {item.description ? (
-                        <span className="line-clamp-2 font-semibold">
-                          {item.description}
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-slate-400 dark:text-slate-500">
-                          —
-                        </span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
-                      <div className="inline-flex items-center justify-end gap-0.5">
+                  <Fragment key={dept.id}>
+                    <tr
+                      className="border-b border-slate-50 text-sm font-semibold dark:border-slate-800/80"
+                    >
+                      <td className="max-w-[min(16rem,50vw)] px-3 py-2 align-middle">
                         <button
                           type="button"
-                          disabled={deleteBlocked}
-                          title={
-                            deleteBlocked
-                              ? `${n} employee(s) assigned — remove assignments first`
-                              : "Delete"
-                          }
-                          onClick={() => {
-                            if (deleteBlocked) return;
-                            const ok = window.confirm(
-                              `Delete “${item.title}”? This cannot be undone.`,
-                            );
-                            if (ok) void onDelete(item.id);
-                          }}
-                          className={[
-                            "rounded-md p-1.5 transition",
-                            deleteBlocked
-                              ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
-                              : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
-                          ].join(" ")}
-                          aria-label={`Delete ${item.title}`}
-                          aria-disabled={deleteBlocked}
+                          onClick={() => onShowDeptEmployees(dept)}
+                          className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
+                          title="View employees assigned to this department"
                         >
-                          <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+                          <span className="font-bold text-slate-900 underline-offset-2 group-hover:underline dark:text-slate-100">
+                            {dept.title}
+                          </span>
+                          <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
+                            ({dn})
+                          </span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditState({ id: item.id, item })
-                          }
-                          className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                          aria-label={`Edit ${item.title}`}
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="max-w-[min(14rem,35vw)] px-3 py-2 align-middle font-medium text-slate-700 dark:text-slate-300">
+                        {dept.description ? (
+                          <span className="line-clamp-2 font-semibold">
+                            {dept.description}
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-slate-400 dark:text-slate-500">
+                            —
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right align-middle">
+                        <div className="inline-flex items-center justify-end gap-0.5">
+                          <button
+                            type="button"
+                            disabled={deptDeleteBlocked}
+                            title={
+                              deptDeleteBlocked
+                                ? `${dn} employee(s) assigned — remove assignments first`
+                                : "Delete"
+                            }
+                            onClick={() => {
+                              if (deptDeleteBlocked) return;
+                              const ok = window.confirm(
+                                `Delete “${dept.title}” and all its sections? This cannot be undone.`,
+                              );
+                              if (ok) void onDeleteDepartment(dept.id);
+                            }}
+                            className={[
+                              "rounded-md p-1.5 transition",
+                              deptDeleteBlocked
+                                ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
+                                : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
+                            ].join(" ")}
+                            aria-label={`Delete ${dept.title}`}
+                            aria-disabled={deptDeleteBlocked}
+                          >
+                            <Trash2
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                              aria-hidden
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDeptEditState({ id: dept.id, item: dept })
+                            }
+                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            aria-label={`Edit ${dept.title}`}
+                            title="Edit"
+                          >
+                            <Pencil
+                              className="h-4 w-4"
+                              strokeWidth={2}
+                              aria-hidden
+                            />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <td colSpan={3} className="bg-slate-50/50 px-0 py-0 dark:bg-slate-950/40">
+                        <div className="border-l-2 border-slate-200 px-3 py-3 pl-5 dark:border-slate-600">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              Sections
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSectionForm({
+                                  mode: "add",
+                                  departmentId: dept.id,
+                                })
+                              }
+                              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                            >
+                              <Plus className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                              Add section
+                            </button>
+                          </div>
+                          {secList.length === 0 ? (
+                            <p className="py-2 text-sm font-medium text-slate-500 dark:text-slate-400">
+                              No sections for this department yet.
+                            </p>
+                          ) : (
+                            <table className="w-full border-collapse text-left text-sm">
+                              <thead>
+                                <tr className="border-b border-slate-200/90 dark:border-slate-700">
+                                  <th className="py-1.5 pr-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Name
+                                  </th>
+                                  <th className="py-1.5 pr-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Description
+                                  </th>
+                                  <th className="w-[1%] py-1.5 text-right text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Action
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {secList.map((item) => {
+                                  const n = secCounts[item.id] ?? 0;
+                                  const deleteBlocked = n > 0;
+                                  return (
+                                    <tr
+                                      key={item.id}
+                                      className="border-b border-slate-100/90 last:border-0 dark:border-slate-800/80"
+                                    >
+                                      <td className="max-w-[min(14rem,45vw)] py-2 pr-2 align-middle">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            onShowSecEmployees(item)
+                                          }
+                                          className="group inline-flex max-w-full flex-wrap items-baseline gap-x-1 text-left text-sm transition"
+                                          title="View employees assigned to this section"
+                                        >
+                                          <span className="font-bold text-slate-800 underline-offset-2 group-hover:underline dark:text-slate-100">
+                                            {item.title}
+                                          </span>
+                                          <span className="font-semibold tabular-nums text-slate-600 dark:text-slate-400">
+                                            ({n})
+                                          </span>
+                                        </button>
+                                      </td>
+                                      <td className="max-w-[min(12rem,35vw)] py-2 pr-2 align-middle text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        {item.description ? (
+                                          <span className="line-clamp-2 font-semibold">
+                                            {item.description}
+                                          </span>
+                                        ) : (
+                                          <span className="font-semibold text-slate-400 dark:text-slate-500">
+                                            —
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="whitespace-nowrap py-2 text-right align-middle">
+                                        <div className="inline-flex items-center justify-end gap-0.5">
+                                          <button
+                                            type="button"
+                                            disabled={deleteBlocked}
+                                            title={
+                                              deleteBlocked
+                                                ? `${n} employee(s) assigned — remove assignments first`
+                                                : "Delete"
+                                            }
+                                            onClick={() => {
+                                              if (deleteBlocked) return;
+                                              const ok = window.confirm(
+                                                `Delete “${item.title}”? This cannot be undone.`,
+                                              );
+                                              if (ok) void onDeleteSection(item.id);
+                                            }}
+                                            className={[
+                                              "rounded-md p-1.5 transition",
+                                              deleteBlocked
+                                                ? "cursor-not-allowed text-slate-300 opacity-50 dark:text-slate-600"
+                                                : "text-slate-600 hover:bg-red-50 hover:text-red-700 dark:text-slate-400 dark:hover:bg-red-950/50 dark:hover:text-red-400",
+                                            ].join(" ")}
+                                            aria-label={`Delete ${item.title}`}
+                                            aria-disabled={deleteBlocked}
+                                          >
+                                            <Trash2
+                                              className="h-4 w-4"
+                                              strokeWidth={2}
+                                              aria-hidden
+                                            />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSectionForm({
+                                                mode: "edit",
+                                                section: item,
+                                              })
+                                            }
+                                            className="rounded-md p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                            aria-label={`Edit ${item.title}`}
+                                            title="Edit"
+                                          >
+                                            <Pencil
+                                              className="h-4 w-4"
+                                              strokeWidth={2}
+                                              aria-hidden
+                                            />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })
             )}
@@ -747,7 +988,7 @@ function mapCount<T extends Record<string, unknown>>(
 
 function buildFallbackCounts(
   deptRows: DirectoryItem[],
-  secRows: DirectoryItem[],
+  secRows: SectionItem[],
   emps: { department: string | null; section: string | null }[],
 ): { dept: Record<string, number>; sec: Record<string, number> } {
   const deptOut: Record<string, number> = {};
@@ -772,7 +1013,7 @@ function buildFallbackCounts(
 
 export function DepartmentSectionSettings() {
   const [departments, setDepartments] = useState<DirectoryItem[]>([]);
-  const [sections, setSections] = useState<DirectoryItem[]>([]);
+  const [sections, setSections] = useState<SectionItem[]>([]);
   const [deptCounts, setDeptCounts] = useState<Record<string, number>>({});
   const [secCounts, setSecCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -808,7 +1049,7 @@ export function DepartmentSectionSettings() {
     const deptRows = ((dRes.data as DirectoryItem[]) ?? [])
       .slice()
       .sort(sortByTitle);
-    const secRows = ((sRes.data as DirectoryItem[]) ?? [])
+    const secRows = ((sRes.data as SectionItem[]) ?? [])
       .slice()
       .sort(sortByTitle);
     setDepartments(deptRows);
@@ -928,11 +1169,15 @@ export function DepartmentSectionSettings() {
     void loadDirectorySnapshot();
   }
 
-  async function addSection(item: { title: string; description: string }) {
+  async function addSection(
+    departmentId: string,
+    item: { title: string; description: string },
+  ) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("sections")
       .insert({
+        department_id: departmentId,
         title: item.title,
         description: item.description,
       })
@@ -950,7 +1195,7 @@ export function DepartmentSectionSettings() {
       throw error;
     }
     setSections((prev) =>
-      [...prev, data as DirectoryItem].sort(sortByTitle),
+      [...prev, data as SectionItem].sort(sortByTitle),
     );
     void loadDirectorySnapshot();
   }
@@ -1037,7 +1282,11 @@ export function DepartmentSectionSettings() {
       prev
         .map((row) =>
           row.id === id
-            ? { ...row, title: item.title, description: item.description }
+            ? {
+                ...row,
+                title: item.title,
+                description: item.description,
+              }
             : row,
         )
         .sort(sortByTitle),
@@ -1054,6 +1303,16 @@ export function DepartmentSectionSettings() {
         `Cannot delete. This department is currently assigned to ${n} employees.`,
       );
       return;
+    }
+    const childSections = sections.filter((s) => s.department_id === id);
+    for (const s of childSections) {
+      const sn = secCounts[s.id] ?? 0;
+      if (sn > 0) {
+        toast.error(
+          `Cannot delete. A section under this department (“${s.title}”) is assigned to ${sn} employee(s).`,
+        );
+        return;
+      }
     }
 
     const supabase = createClient();
@@ -1132,32 +1391,24 @@ export function DepartmentSectionSettings() {
         item={employeeListModal?.item ?? null}
         onViewEmployee={(id) => setDetailEmployeeId(id)}
       />
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <DirectoryPanel
-          kind="department"
-          title="Departments"
-          items={departments}
-          counts={deptCounts}
-          onAdd={addDepartment}
-          onUpdate={updateDepartment}
-          onDelete={deleteDepartment}
-          onShowEmployees={(item) =>
-            setEmployeeListModal({ field: "department", item })
-          }
-        />
-        <DirectoryPanel
-          kind="section"
-          title="Sections"
-          items={sections}
-          counts={secCounts}
-          onAdd={addSection}
-          onUpdate={updateSection}
-          onDelete={deleteSection}
-          onShowEmployees={(item) =>
-            setEmployeeListModal({ field: "section", item })
-          }
-        />
-      </div>
+      <DepartmentsWithNestedSections
+        departments={departments}
+        sections={sections}
+        deptCounts={deptCounts}
+        secCounts={secCounts}
+        onAddDepartment={addDepartment}
+        onUpdateDepartment={updateDepartment}
+        onDeleteDepartment={deleteDepartment}
+        onAddSection={addSection}
+        onUpdateSection={updateSection}
+        onDeleteSection={deleteSection}
+        onShowDeptEmployees={(item) =>
+          setEmployeeListModal({ field: "department", item })
+        }
+        onShowSecEmployees={(item) =>
+          setEmployeeListModal({ field: "section", item })
+        }
+      />
     </>
   );
 }
