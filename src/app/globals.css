@@ -57,3 +57,52 @@ body {
     animation: navigation-route-bar 1.1s ease-in-out infinite;
   }
 }
+
+/* -----------------------------------------------------------------------------
+   Light theme: clearer borders on inputs, cards, tables (slate-200 → slate-300).
+   Dark mode unchanged (html.dark). Uses !important to win over same-specificity
+   utilities without editing every component.
+   ----------------------------------------------------------------------------- */
+@layer utilities {
+  html:not(.dark) .border-slate-100 {
+    border-color: rgb(226 232 240) !important; /* slate-200 */
+  }
+
+  html:not(.dark) .border-slate-200,
+  html:not(.dark) .border-slate-200\/90,
+  html:not(.dark) .border-slate-200\/80,
+  html:not(.dark) .border-slate-200\/70 {
+    border-color: rgb(203 213 225) !important; /* slate-300 */
+  }
+
+  html:not(.dark) .border-slate-300 {
+    border-color: rgb(148 163 184) !important; /* slate-400 */
+  }
+
+  /* Table row / cell dividers that used very light borders */
+  html:not(.dark) .border-slate-100\/90,
+  html:not(.dark) .border-slate-100\/80 {
+    border-color: rgb(226 232 240) !important;
+  }
+
+  /* Rings (avatars, tabs, search bar) */
+  html:not(.dark) .ring-slate-200,
+  html:not(.dark) .ring-slate-200\/90,
+  html:not(.dark) .ring-slate-200\/80 {
+    --tw-ring-color: rgb(203 213 225) !important;
+  }
+
+  html:not(.dark) .ring-slate-200\/60,
+  html:not(.dark) .ring-slate-200\/70 {
+    --tw-ring-color: rgb(203 213 225) !important;
+  }
+
+  /* divide-y divide-slate-* (border between rows) */
+  html:not(.dark) .divide-y.divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-top-color: rgb(226 232 240) !important; /* slate-200 */
+  }
+
+  html:not(.dark) .divide-y.divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-top-color: rgb(203 213 225) !important; /* slate-300 */
+  }
+}

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { memo, useMemo } from "react";
@@ -13,8 +12,6 @@ import {
   Database,
 } from "lucide-react";
 import { ThemeToggle } from "@/src/components/ThemeToggle";
-import darkLogo from "@/logo/Dark Logo .png";
-import lightLogo from "@/logo/Light Logo.png";
 
 const nav: {
   href: string;
@@ -72,28 +69,15 @@ function SidebarComponent({ mobileOpen, onNavigate }: SidebarProps) {
         <Link
           href="/dashboard"
           onClick={onNavigate}
-          className="flex min-h-[3.75rem] min-w-0 items-center outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-slate-400 dark:ring-offset-slate-950 dark:focus-visible:ring-slate-500"
+          className="flex min-h-[3.75rem] min-w-0 flex-col justify-center gap-0.5 outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-slate-400 dark:ring-offset-slate-950 dark:focus-visible:ring-slate-500"
         >
-          <span className="sr-only">Dashboard</span>
-          <Image
-            src={lightLogo}
-            alt="ShaPosh"
-            width={lightLogo.width}
-            height={lightLogo.height}
-            priority
-            className="h-16 w-full max-w-[min(100%,14rem)] object-contain object-left dark:hidden sm:h-[4.5rem]"
-            sizes="(max-width: 768px) 220px, 240px"
-          />
-          <Image
-            src={darkLogo}
-            alt=""
-            width={darkLogo.width}
-            height={darkLogo.height}
-            priority
-            aria-hidden
-            className="hidden h-16 w-full max-w-[min(100%,14rem)] object-contain object-left dark:block sm:h-[4.5rem]"
-            sizes="(max-width: 768px) 220px, 240px"
-          />
+          <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-[1.65rem]">
+            ERS
+          </span>
+          <span className="text-[0.7rem] font-medium leading-snug text-slate-600 dark:text-slate-400 sm:text-xs">
+            Employee Record System
+          </span>
+          <span className="sr-only"> — go to dashboard</span>
         </Link>
       </div>
 

@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Employee Management System",
-    template: "%s · Employee Management System",
+    default: "Employee Record System",
+    template: "%s · ERS",
   },
   description:
     "Manage employees, roles, and organizational records in one place.",
@@ -40,7 +40,7 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="light"
           enableSystem={false}
         >
           <Providers>{children}</Providers>

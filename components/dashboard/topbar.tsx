@@ -8,7 +8,7 @@ import { useTopbarEndSlot } from "./topbar-slot-context";
 
 const titles: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/employees": "Employee Management",
+  "/employees": "Employees",
   "/employees/new": "Add employee",
   "/profile": "Profile",
   "/settings": "Users",

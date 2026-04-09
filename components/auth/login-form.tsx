@@ -58,12 +58,15 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-[400px] rounded-2xl border border-slate-200/90 bg-white p-8 shadow-lg dark:border-slate-700 dark:bg-slate-900">
       <div className="mb-6 text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+        <p className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          ERS
+        </p>
+        <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-400">
+          Employee Record System
+        </p>
+        <h1 className="mt-5 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
           Sign in
         </h1>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Employee Management System
-        </p>
       </div>
 
       {accessDenied ? (
