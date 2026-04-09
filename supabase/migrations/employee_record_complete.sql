@@ -98,6 +98,7 @@ create table if not exists public.employees (
   dob text,
   cnic_no text not null,
   ss_eubi_no text,
+  basic_salary text,
   phone_no text,
   city text,
   address text,
@@ -133,6 +134,7 @@ alter table public.employees add column if not exists father_name text;
 alter table public.employees add column if not exists dob text;
 alter table public.employees add column if not exists cnic_no text;
 alter table public.employees add column if not exists ss_eubi_no text;
+alter table public.employees add column if not exists basic_salary text;
 alter table public.employees add column if not exists phone_no text;
 alter table public.employees add column if not exists city text;
 alter table public.employees add column if not exists address text;

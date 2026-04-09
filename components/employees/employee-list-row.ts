@@ -10,6 +10,8 @@ export type EmployeeListRow = {
   dob: string | null;
   cnic_no: string;
   ss_eubi_no: string | null;
+  /** Optional — Personal tab */
+  basic_salary: string | null;
   phone_no: string | null;
   city: string | null;
   department: string;

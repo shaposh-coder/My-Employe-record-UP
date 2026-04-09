@@ -1,6 +1,6 @@
 /** Column visibility for Employees directory table (persisted in localStorage). */
 
-export const EMPLOYEES_COLUMN_VISIBILITY_KEY = "ems:employees:columns:v1";
+export const EMPLOYEES_COLUMN_VISIBILITY_KEY = "ems:employees:columns:v2";
 
 export const EMPLOYEE_COLUMN_IDS = [
   "image",
@@ -13,6 +13,7 @@ export const EMPLOYEE_COLUMN_IDS = [
   "city",
   "department",
   "section",
+  "basic_salary",
   "education",
   "address",
   "experience",
@@ -70,6 +71,7 @@ export const EMPLOYEE_COLUMN_LABELS: Record<EmployeeColumnId, string> = {
   city: "CITY",
   department: "DEPARTMENT",
   section: "SECTION",
+  basic_salary: "BASIC SALARY",
   education: "EDUCATION",
   address: "ADDRESS",
   experience: "EXPERIENCE",
@@ -85,7 +87,10 @@ export const EMPLOYEE_COLUMN_LABELS: Record<EmployeeColumnId, string> = {
 };
 
 /** Optional columns that start visible for new users (fixed columns are always on). */
-const DEFAULT_OPTIONAL_VISIBLE = new Set<EmployeeColumnId>(["phone"]);
+const DEFAULT_OPTIONAL_VISIBLE = new Set<EmployeeColumnId>([
+  "phone",
+  "basic_salary",
+]);
 
 export function defaultColumnVisibility(): Record<EmployeeColumnId, boolean> {
   const v = {} as Record<EmployeeColumnId, boolean>;

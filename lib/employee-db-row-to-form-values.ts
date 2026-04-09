@@ -32,6 +32,7 @@ export function employeeDbRowToFormValues(
     dob: String(d.dob ?? ""),
     cnic_no: normalizeCnicFromDb(String(d.cnic_no ?? "")),
     ss_eubi_no: String(d.ss_eubi_no ?? ""),
+    basic_salary: String(d.basic_salary ?? ""),
     phone_no: normalizePhoneFromDb(String(d.phone_no ?? "")),
     city: String(d.city ?? ""),
     address: String(d.address ?? ""),

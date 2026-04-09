@@ -92,6 +92,8 @@ function columnMinClass(colId: EmployeeColumnId): string {
       return "min-w-[3.25rem]";
     case "status":
       return "min-w-[8rem]";
+    case "basic_salary":
+      return "min-w-[7.5rem] tabular-nums";
     default:
       return "min-w-[150px]";
   }
@@ -171,6 +173,12 @@ function buildColumnDefs(
       id: "section",
       header: "SECTION",
       cell: (row) => fmt(row.section),
+    },
+    {
+      id: "basic_salary",
+      header: "BASIC SALARY",
+      cell: (row) => fmt(row.basic_salary),
+      tdClass: "tabular-nums",
     },
     {
       id: "education",

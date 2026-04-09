@@ -47,6 +47,7 @@ const defaultValues: AddEmployeeFormValues = {
   dob: "",
   cnic_no: "",
   ss_eubi_no: "",
+  basic_salary: "",
   phone_no: "",
   city: "",
   address: "",
@@ -521,6 +522,7 @@ export function AddEmployeeForm({
       dob: data.dob || null,
       cnic_no: data.cnic_no,
       ss_eubi_no: data.ss_eubi_no || null,
+      basic_salary: data.basic_salary.trim() || null,
       phone_no: data.phone_no || null,
       city: data.city || null,
       address: data.address || null,
@@ -548,7 +550,7 @@ export function AddEmployeeForm({
     };
 
     const selectCols =
-      "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, phone_no, city, department, section, status, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt";
+      "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, basic_salary, phone_no, city, department, section, status, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt";
 
     if (editEmployeeId) {
       const { data: updated, error } = await supabase
@@ -630,7 +632,7 @@ export function AddEmployeeForm({
   if (loadingEmployee) {
     return (
       <div
-        className={`${inter.className} relative w-full min-w-0`}
+        className={`${inter.className} relative flex min-h-0 w-full min-w-0 flex-1 flex-col`}
         aria-busy="true"
         aria-label="Loading employee"
       >
@@ -647,16 +649,19 @@ export function AddEmployeeForm({
 
   return (
     <div
-      className={`${inter.className} w-full min-w-0 text-slate-900 antialiased dark:text-slate-100`}
+      className={`${inter.className} flex min-h-0 w-full min-w-0 flex-1 flex-col text-slate-900 antialiased dark:text-slate-100`}
     >
       {submitError ? (
-        <p className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
+        <p className="mb-6 shrink-0 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200">
           {submitError}
         </p>
       ) : null}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-0">
-        <div className="flex h-[calc(100dvh-7.5rem)] min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex min-h-0 flex-1 flex-col gap-0"
+      >
+        <div className="flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
           <div className="flex shrink-0 items-start gap-2 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60">
             <div
               role="tablist"
@@ -831,6 +836,26 @@ export function AddEmployeeForm({
                   />
                 </div>
                 {renderDepartmentSectionFields("personal")}
+                <div>
+                  <label htmlFor="basic_salary" className={labelClass}>
+                    Basic salary
+                  </label>
+                  <input
+                    id="basic_salary"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="e.g. 50000"
+                    className={inputClass}
+                    aria-invalid={Boolean(errors.basic_salary)}
+                    {...register("basic_salary")}
+                  />
+                  {errors.basic_salary ? (
+                    <p className={errorClass} role="alert">
+                      {errors.basic_salary.message}
+                    </p>
+                  ) : null}
+                </div>
                 <div>
                   <label htmlFor="phone_no" className={labelClass}>
                     Phone number

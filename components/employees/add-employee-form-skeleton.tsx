@@ -4,8 +4,8 @@
  */
 export function AddEmployeeFormSkeleton() {
   return (
-    <div className="mx-auto w-full min-w-0 max-w-5xl pb-16">
-      <div className="h-[calc(100dvh-7.5rem)] min-h-[28rem] w-full min-w-0 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
+    <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-5xl flex-1 flex-col">
+      <div className="flex min-h-[28rem] w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
         <div
           className="flex shrink-0 flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60"
           aria-hidden

@@ -26,6 +26,14 @@ const optionalPhone = z
     "Use format 0305-1234567 (11 digits)",
   );
 
+/** Empty or a non‑negative amount (digits, optional decimals; commas allowed). */
+const optionalSalary = z.string().refine((v) => {
+  const t = v.trim();
+  if (t === "") return true;
+  const n = Number(t.replace(/,/g, ""));
+  return Number.isFinite(n) && n >= 0 && n <= 1e12;
+}, "Enter a valid amount");
+
 export const addEmployeeSchema = z.object({
   full_name: z.string().min(1, "Full name is required").max(200),
   status: z.enum(["Active", "Un-Active"]),
@@ -39,6 +47,7 @@ export const addEmployeeSchema = z.object({
       "Use format 33203-1234567-5 (complete 13 digits)",
     ),
   ss_eubi_no: optionalText,
+  basic_salary: optionalSalary,
   phone_no: phoneField("Phone number"),
   city: z.string().min(1, "City is required").max(120),
   address: z.string().min(1, "Address is required").max(1000),

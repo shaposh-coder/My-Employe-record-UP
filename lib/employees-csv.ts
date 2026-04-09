@@ -33,6 +33,7 @@ export const EMPLOYEES_CSV_HEADERS = [
   "Father Name",
   "DOB",
   "SS/EOBI No",
+  "Basic Salary",
   "Phone",
   "City",
   "Address",
@@ -77,6 +78,8 @@ const HEADER_ALIASES: Record<string, EmployeesCsvHeaderKey> = {
   "ss/eubi no": "SS/EOBI No",
   "ss/eobi no": "SS/EOBI No",
   ss_eubi_no: "SS/EOBI No",
+  "basic salary": "Basic Salary",
+  basic_salary: "Basic Salary",
   reference: "Reference",
   reference_info: "Reference",
   instagram: SOCIAL_PLATFORM_LABELS.instagram,
@@ -141,6 +144,7 @@ export function employeeRowToCsvValues(row: EmployeeListRow): string[] {
     row.father_name ?? "",
     row.dob ?? "",
     row.ss_eubi_no ?? "",
+    row.basic_salary ?? "",
     row.phone_no ?? "",
     row.city ?? "",
     row.address ?? "",
@@ -312,6 +316,7 @@ export function csvRowToEmployeePatch(
   set("father_name", byHeader["Father Name"]);
   set("dob", byHeader["DOB"]);
   set("ss_eubi_no", byHeader["SS/EOBI No"]);
+  set("basic_salary", byHeader["Basic Salary"]);
   const phone = byHeader["Phone"];
   if (phone?.trim()) {
     patch.phone_no = normalizePhoneFromDb(phone);

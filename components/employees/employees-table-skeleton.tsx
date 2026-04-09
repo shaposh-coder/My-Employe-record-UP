@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  EMPLOYEE_COLUMN_IDS,
   ensureFixedColumnVisibility,
   type EmployeeColumnId,
 } from "@/lib/employee-table-columns";
@@ -15,6 +16,8 @@ function columnMinClass(colId: EmployeeColumnId): string {
       return "min-w-[3.25rem]";
     case "status":
       return "min-w-[6.5rem]";
+    case "basic_salary":
+      return "min-w-[7.5rem]";
     default:
       return "min-w-[150px]";
   }
@@ -42,9 +45,7 @@ export function EmployeesTableSkeleton({
   embedInCard?: boolean;
 }) {
   const effective = ensureFixedColumnVisibility(visibility);
-  const visibleIds = (Object.keys(effective) as EmployeeColumnId[]).filter(
-    (id) => effective[id] === true,
-  );
+  const visibleIds = EMPLOYEE_COLUMN_IDS.filter((id) => effective[id] === true);
   const cols =
     visibleIds.length > 0 ? visibleIds : (["image", "name"] as EmployeeColumnId[]);
   const rows = Math.max(1, Math.min(rowCount, 100));

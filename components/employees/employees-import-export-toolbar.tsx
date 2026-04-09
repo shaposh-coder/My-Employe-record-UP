@@ -159,6 +159,7 @@ export function EmployeesImportExportToolbar({
               experience: patch.experience ?? null,
               email_address: patch.email_address ?? null,
               ss_eubi_no: patch.ss_eubi_no ?? null,
+              basic_salary: patch.basic_salary ?? null,
               reference_info: patch.reference_info ?? null,
               family_cnic: patch.family_cnic ?? null,
               family_phone: patch.family_phone ?? null,

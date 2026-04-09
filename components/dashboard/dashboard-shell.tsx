@@ -26,7 +26,7 @@ export function DashboardShell({
 
   return (
     <UserAccessProvider profile={profile}>
-      <div className="flex min-h-[100dvh] w-full bg-background text-foreground">
+      <div className="flex h-dvh max-h-dvh min-h-0 w-full overflow-hidden bg-background text-foreground">
         <NavigationProgress />
         <Sidebar mobileOpen={mobileOpen} onNavigate={closeMobile} />
 
@@ -40,9 +40,9 @@ export function DashboardShell({
         ) : null}
 
         <TopbarEndSlotProvider>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
             <Topbar mobileOpen={mobileOpen} onMenuClick={toggleMobile} />
-            <main className="flex min-h-0 flex-1 flex-col bg-background px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
+            <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-background px-4 py-8 sm:px-6 sm:py-10 lg:px-10">
               {children}
             </main>
           </div>

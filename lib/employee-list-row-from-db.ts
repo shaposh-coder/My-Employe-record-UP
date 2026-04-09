@@ -13,6 +13,7 @@ export function employeeListRowFromDbRow(
     dob: (row.dob as string | null) ?? null,
     cnic_no: String(row.cnic_no ?? ""),
     ss_eubi_no: (row.ss_eubi_no as string | null) ?? null,
+    basic_salary: (row.basic_salary as string | null) ?? null,
     phone_no: (row.phone_no as string | null) ?? null,
     city: (row.city as string | null) ?? null,
     department: String(row.department ?? ""),
