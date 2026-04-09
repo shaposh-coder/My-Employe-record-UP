@@ -85,7 +85,7 @@ cp .env.local.example .env.local
 |----------|----------------|---------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Browser & server | Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser & server | Public anon key (safe to expose in client bundles). |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** | Used by API routes (e.g. creating users with passwords in **Settings**). Never commit real values or expose this key in client code. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** | Used by API routes (e.g. creating users with passwords on the **Users** page). Never commit real values or expose this key in client code. |
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co

@@ -5,7 +5,7 @@ import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   addEmployeeSchema,
@@ -251,6 +251,81 @@ export function AddEmployeeForm({
   function handleCloseForm() {
     router.push("/employees");
   }
+
+  /** Department + section — same form fields rendered on Personal and Work tabs (linked via `watch` / `setValue`). */
+  const renderDepartmentSectionFields = (suffix: "personal" | "work") => (
+    <>
+      {configError ? (
+        <div
+          className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
+          role="alert"
+        >
+          Could not load departments/sections: {configError}. Check
+          Configuration in Supabase and try again.
+        </div>
+      ) : null}
+      <div>
+        <label htmlFor={`department-${suffix}`} className={labelClass}>
+          Department
+          <ReqStar />
+        </label>
+        <SearchableCombobox
+          id={`department-${suffix}`}
+          options={departments}
+          value={departmentValue ?? ""}
+          onChange={(v) =>
+            setValue("department", v, { shouldValidate: true, shouldDirty: true })
+          }
+          onBlur={() => void trigger("department")}
+          loading={configLoading}
+          disabled={configLoading || departments.length === 0}
+          inputClassName={inputClass}
+          emptyMessage="No departments — add in Configuration"
+          searchPlaceholder="Search or select department"
+          aria-invalid={Boolean(errors.department)}
+        />
+        {errors.department ? (
+          <p className={errorClass} role="alert">
+            {errors.department.message}
+          </p>
+        ) : null}
+      </div>
+      <div>
+        <label htmlFor={`section-${suffix}`} className={labelClass}>
+          Section
+          <ReqStar />
+        </label>
+        <SearchableCombobox
+          id={`section-${suffix}`}
+          options={sectionOptionsForDepartment}
+          value={sectionValue ?? ""}
+          onChange={(v) =>
+            setValue("section", v, { shouldValidate: true, shouldDirty: true })
+          }
+          onBlur={() => void trigger("section")}
+          loading={configLoading}
+          disabled={
+            configLoading ||
+            !departmentValue?.trim() ||
+            sectionOptionsForDepartment.length === 0
+          }
+          inputClassName={inputClass}
+          emptyMessage={
+            !departmentValue?.trim()
+              ? "Select a department first"
+              : "No sections for this department — add in Configuration"
+          }
+          searchPlaceholder="Search or select section"
+          aria-invalid={Boolean(errors.section)}
+        />
+        {errors.section ? (
+          <p className={errorClass} role="alert">
+            {errors.section.message}
+          </p>
+        ) : null}
+      </div>
+    </>
+  );
 
   useEffect(() => {
     const el = tabScrollRef.current;
@@ -572,34 +647,44 @@ export function AddEmployeeForm({
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-0">
         <div className="flex h-[calc(100dvh-7.5rem)] min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:h-[calc(100dvh-9rem)] dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-          <div
-            role="tablist"
-            aria-label="Employee form sections"
-            className="flex shrink-0 flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60"
-          >
-            {TABS.map((tab) => {
-              const selected = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  id={`tab-${tab.id}`}
-                  aria-selected={selected}
-                  aria-controls={`panel-${tab.id}`}
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={[
-                    "rounded-lg px-3 py-2.5 text-sm font-medium transition sm:px-4",
-                    selected
-                      ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600"
-                      : "text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100",
-                  ].join(" ")}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+          <div className="flex shrink-0 items-start gap-2 border-b border-slate-100 bg-slate-50/90 p-2 dark:border-slate-800 dark:bg-slate-950/60">
+            <div
+              role="tablist"
+              aria-label="Employee form sections"
+              className="flex min-w-0 flex-1 flex-wrap gap-1"
+            >
+              {TABS.map((tab) => {
+                const selected = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`tab-${tab.id}`}
+                    aria-selected={selected}
+                    aria-controls={`panel-${tab.id}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={[
+                      "rounded-lg px-3 py-2.5 text-sm font-medium transition sm:px-4",
+                      selected
+                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600"
+                        : "text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100",
+                    ].join(" ")}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={() => router.push("/employees")}
+              className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              aria-label="Close form"
+            >
+              <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </button>
           </div>
 
           <div
@@ -718,7 +803,7 @@ export function AddEmployeeForm({
                       Checking CNIC…
                     </p>
                   ) : null}
-                  {errors.cnic_no ? (
+                  {errors.cnic_no?.message ? (
                     <p className={errorClass} role="alert">
                       {errors.cnic_no.message}
                     </p>
@@ -802,6 +887,7 @@ export function AddEmployeeForm({
                     </p>
                   ) : null}
                 </div>
+                {renderDepartmentSectionFields("personal")}
               </div>
             </div>
 
@@ -813,83 +899,7 @@ export function AddEmployeeForm({
               hidden={activeTab !== "work"}
             >
               <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
-                {configError ? (
-                  <div
-                    className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100"
-                    role="alert"
-                  >
-                    Could not load departments/sections: {configError}. Check
-                    Configuration in Supabase and try again.
-                  </div>
-                ) : null}
-                <div>
-                  <label htmlFor="department" className={labelClass}>
-                    Department
-                    <ReqStar />
-                  </label>
-                  <Controller
-                    name="department"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchableCombobox
-                        id="department"
-                        options={departments}
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        loading={configLoading}
-                        disabled={configLoading || departments.length === 0}
-                        inputClassName={inputClass}
-                        emptyMessage="No departments — add in Configuration"
-                        searchPlaceholder="Search or select department"
-                        aria-invalid={Boolean(errors.department)}
-                      />
-                    )}
-                  />
-                  {errors.department ? (
-                    <p className={errorClass} role="alert">
-                      {errors.department.message}
-                    </p>
-                  ) : null}
-                </div>
-                <div>
-                  <label htmlFor="section" className={labelClass}>
-                    Section
-                    <ReqStar />
-                  </label>
-                  <Controller
-                    name="section"
-                    control={control}
-                    render={({ field }) => (
-                      <SearchableCombobox
-                        id="section"
-                        options={sectionOptionsForDepartment}
-                        value={field.value}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        loading={configLoading}
-                        disabled={
-                          configLoading ||
-                          !departmentValue?.trim() ||
-                          sectionOptionsForDepartment.length === 0
-                        }
-                        inputClassName={inputClass}
-                        emptyMessage={
-                          !departmentValue?.trim()
-                            ? "Select a department first"
-                            : "No sections for this department — add in Configuration"
-                        }
-                        searchPlaceholder="Search or select section"
-                        aria-invalid={Boolean(errors.section)}
-                      />
-                    )}
-                  />
-                  {errors.section ? (
-                    <p className={errorClass} role="alert">
-                      {errors.section.message}
-                    </p>
-                  ) : null}
-                </div>
+                {renderDepartmentSectionFields("work")}
                 <div className="sm:col-span-2">
                   <label htmlFor="education" className={labelClass}>
                     Education

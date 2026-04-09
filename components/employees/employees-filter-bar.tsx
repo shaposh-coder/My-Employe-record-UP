@@ -11,9 +11,16 @@ const STATUS_FILTER_OPTIONS = [
   EMPLOYEE_STATUS.UnActive,
 ] as const;
 
+const textFilterInputClass =
+  "w-full rounded-lg border border-slate-200/90 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-900/[0.08] disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-500 dark:focus:ring-slate-400/20";
+
 function EmployeesFilterBarInner({
   searchQuery,
   onSearchChange,
+  filterName,
+  filterCnic,
+  onFilterNameChange,
+  onFilterCnicChange,
   department,
   section,
   city,
@@ -35,6 +42,10 @@ function EmployeesFilterBarInner({
 }: {
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  filterName: string;
+  filterCnic: string;
+  onFilterNameChange: (value: string) => void;
+  onFilterCnicChange: (value: string) => void;
   department: string;
   section: string;
   city: string;
@@ -49,7 +60,7 @@ function EmployeesFilterBarInner({
   cityOptions: string[];
   onClearFilters: () => void;
   hasActiveFilters: boolean;
-  /** Number of active dropdown filters (Department / Section / City / Status). */
+  /** Number of active filters (Name / CNIC / Department / Section / City / Status). */
   activeFilterCount: number;
   filterControlsDisabled?: boolean;
   variant?: "default" | "toolbar";
@@ -120,6 +131,44 @@ function EmployeesFilterBarInner({
             sideOffset={8}
             className="z-[200] w-[min(calc(100vw-2rem),20rem)] rounded-xl border border-slate-200/90 bg-white p-3 shadow-lg outline-none dark:border-slate-600 dark:bg-slate-900"
           >
+            <div className="mb-3 flex flex-col gap-3 border-b border-slate-100 pb-3 dark:border-slate-700">
+              <div>
+                <label
+                  htmlFor="employees-filter-name"
+                  className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200"
+                >
+                  Name
+                </label>
+                <input
+                  id="employees-filter-name"
+                  type="text"
+                  value={filterName}
+                  onChange={(e) => onFilterNameChange(e.target.value)}
+                  placeholder="Type to filter by name"
+                  autoComplete="off"
+                  disabled={filterControlsDisabled}
+                  className={textFilterInputClass}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="employees-filter-cnic"
+                  className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200"
+                >
+                  CNIC#
+                </label>
+                <input
+                  id="employees-filter-cnic"
+                  type="text"
+                  value={filterCnic}
+                  onChange={(e) => onFilterCnicChange(e.target.value)}
+                  placeholder="Type CNIC (digits or full format)"
+                  autoComplete="off"
+                  disabled={filterControlsDisabled}
+                  className={textFilterInputClass}
+                />
+              </div>
+            </div>
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Filters
             </p>

@@ -223,7 +223,7 @@ export function UsersAccessSettings({
           <div className="flex items-center gap-2 text-slate-900 dark:text-slate-100">
             <Users className="h-6 w-6 shrink-0 opacity-90" strokeWidth={1.75} />
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              Users &amp; access
+              Users
             </h1>
           </div>
         </div>

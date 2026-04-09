@@ -87,6 +87,10 @@ export function EmployeesDirectoryClient({
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [nameFilterInput, setNameFilterInput] = useState("");
+  const [debouncedNameFilter, setDebouncedNameFilter] = useState("");
+  const [cnicFilterInput, setCnicFilterInput] = useState("");
+  const [debouncedCnicFilter, setDebouncedCnicFilter] = useState("");
   const [department, setDepartment] = useState(
     () => searchParams.get("department") ?? "",
   );
@@ -115,6 +119,20 @@ export function EmployeesDirectoryClient({
   }, [searchInput]);
 
   useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedNameFilter(nameFilterInput);
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [nameFilterInput]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setDebouncedCnicFilter(cnicFilterInput);
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [cnicFilterInput]);
+
+  useEffect(() => {
     setDepartment(departmentParam);
     setSection(sectionParam);
     setCity(cityParam);
@@ -126,7 +144,15 @@ export function EmployeesDirectoryClient({
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status, department, section, city]);
+  }, [
+    debouncedSearch,
+    debouncedNameFilter,
+    debouncedCnicFilter,
+    status,
+    department,
+    section,
+    city,
+  ]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(totalCount / pageSize) || 1);
@@ -136,12 +162,22 @@ export function EmployeesDirectoryClient({
   const filterCriteria = useMemo(
     () => ({
       search: debouncedSearch.trim() || undefined,
+      name: debouncedNameFilter.trim() || undefined,
+      cnic: debouncedCnicFilter.trim() || undefined,
       department: department.trim() || undefined,
       section: section.trim() || undefined,
       city: city.trim() || undefined,
       status: status || undefined,
     }),
-    [debouncedSearch, department, section, city, status],
+    [
+      debouncedSearch,
+      debouncedNameFilter,
+      debouncedCnicFilter,
+      department,
+      section,
+      city,
+      status,
+    ],
   );
 
   const directoryCriteriaKey = useMemo(
@@ -158,19 +194,31 @@ export function EmployeesDirectoryClient({
     () =>
       Boolean(
         debouncedSearch.trim() ||
+          debouncedNameFilter.trim() ||
+          debouncedCnicFilter.trim() ||
           department.trim() ||
           section.trim() ||
           city.trim() ||
           status,
       ),
-    [debouncedSearch, department, section, city, status],
+    [
+      debouncedSearch,
+      debouncedNameFilter,
+      debouncedCnicFilter,
+      department,
+      section,
+      city,
+      status,
+    ],
   );
 
   const activeFilterCount = useMemo(
     () =>
+      (nameFilterInput.trim() ? 1 : 0) +
+      (cnicFilterInput.trim() ? 1 : 0) +
       [department, section, city].filter((v) => v.trim() !== "").length +
       (status ? 1 : 0),
-    [department, section, city, status],
+    [nameFilterInput, cnicFilterInput, department, section, city, status],
   );
 
   const exportFilters = useMemo((): Omit<
@@ -179,12 +227,22 @@ export function EmployeesDirectoryClient({
   > => {
     return {
       search: debouncedSearch.trim() || undefined,
+      name: debouncedNameFilter.trim() || undefined,
+      cnic: debouncedCnicFilter.trim() || undefined,
       department: department.trim() || undefined,
       section: section.trim() || undefined,
       city: city.trim() || undefined,
       status: status || undefined,
     };
-  }, [debouncedSearch, department, section, city, status]);
+  }, [
+    debouncedSearch,
+    debouncedNameFilter,
+    debouncedCnicFilter,
+    department,
+    section,
+    city,
+    status,
+  ]);
 
   const loadRows = useCallback(async () => {
     const { rows: next, total, error } = await loadEmployeesDirectory({
@@ -305,6 +363,10 @@ export function EmployeesDirectoryClient({
   const handleClearFilters = useCallback(() => {
     setSearchInput("");
     setDebouncedSearch("");
+    setNameFilterInput("");
+    setDebouncedNameFilter("");
+    setCnicFilterInput("");
+    setDebouncedCnicFilter("");
     setDepartment("");
     setSection("");
     setCity("");
@@ -360,6 +422,10 @@ export function EmployeesDirectoryClient({
           variant="toolbar"
           searchQuery={searchInput}
           onSearchChange={setSearchInput}
+          filterName={nameFilterInput}
+          filterCnic={cnicFilterInput}
+          onFilterNameChange={setNameFilterInput}
+          onFilterCnicChange={setCnicFilterInput}
           department={department}
           section={section}
           city={city}
@@ -401,6 +467,8 @@ export function EmployeesDirectoryClient({
     ),
     [
       searchInput,
+      nameFilterInput,
+      cnicFilterInput,
       department,
       section,
       city,

@@ -28,7 +28,7 @@ export function LoginForm() {
 
   const accessDenied =
     urlError === "noaccess"
-      ? "Your account is not in Users & access. Ask an admin to add you in Settings."
+      ? "Your account is not in Users & access. Ask an admin to add you in Users."
       : null;
 
   useEffect(() => {

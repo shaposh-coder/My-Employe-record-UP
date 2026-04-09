@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Users,
-  Settings,
+  UserCog,
   Database,
 } from "lucide-react";
 import { ThemeToggle } from "@/src/components/ThemeToggle";
@@ -24,7 +24,7 @@ const nav: {
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/configuration", label: "Configuration", icon: Database },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Users", icon: UserCog },
 ];
 
 function navItemActive(pathname: string, href: string) {

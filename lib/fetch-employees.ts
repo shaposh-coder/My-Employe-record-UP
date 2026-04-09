@@ -27,6 +27,10 @@ export type FetchEmployeesOptions = {
   pageSize?: number;
   /** Trims; server-side `ilike` on name, phone, CNIC, city, department, section. */
   search?: string;
+  /** Narrow `full_name` only (AND with other filters). */
+  name?: string;
+  /** Narrow `cnic_no` only (AND with other filters). */
+  cnic?: string;
   department?: string;
   section?: string;
   city?: string;
@@ -97,6 +101,22 @@ export async function fetchEmployees(
       }
     }
 
+    const nameRaw = options?.name?.trim();
+    if (nameRaw) {
+      const token = sanitizeSearchToken(nameRaw);
+      if (token.length > 0) {
+        query = query.ilike("full_name", `%${token}%`);
+      }
+    }
+
+    const cnicRaw = options?.cnic?.trim();
+    if (cnicRaw) {
+      const token = sanitizeSearchToken(cnicRaw);
+      if (token.length > 0) {
+        query = query.ilike("cnic_no", `%${token}%`);
+      }
+    }
+
     const dept = options?.department?.trim();
     if (dept) query = query.eq("department", dept);
 
@@ -133,7 +153,7 @@ export async function fetchEmployees(
 
 /**
  * Loads every row matching the same filters as the directory (paginated internally).
- * Used for CSV export — respects current search / department / section / city / status.
+ * Used for CSV export — respects search, name, CNIC, department, section, city, status.
  */
 export async function fetchAllEmployeesForExport(
   supabase: SupabaseClient,

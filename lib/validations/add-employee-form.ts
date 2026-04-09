@@ -3,15 +3,6 @@ import { CNIC_FORMAT_REGEX, PHONE_FORMAT_REGEX } from "@/lib/format-cnic-phone";
 
 const optionalText = z.string().optional();
 
-const cnicField = (label: string) =>
-  z
-    .string()
-    .min(1, `${label} is required`)
-    .regex(
-      CNIC_FORMAT_REGEX,
-      "Use format 33203-1234567-5 (complete 13 digits)",
-    );
-
 const phoneField = (label: string) =>
   z
     .string()
@@ -40,7 +31,13 @@ export const addEmployeeSchema = z.object({
   status: z.enum(["Active", "Un-Active"]),
   father_name: z.string().min(1, "Father’s name is required").max(200),
   dob: z.string().min(1, "Date of birth is required"),
-  cnic_no: cnicField("CNIC / national ID"),
+  cnic_no: z
+    .string()
+    .min(1, { message: "" })
+    .regex(
+      CNIC_FORMAT_REGEX,
+      "Use format 33203-1234567-5 (complete 13 digits)",
+    ),
   ss_eubi_no: optionalText,
   phone_no: phoneField("Phone number"),
   city: z.string().min(1, "City is required").max(120),

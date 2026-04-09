@@ -25,7 +25,7 @@ export const USER_ACCESS_ROLE_LABELS: Record<UserAccessRole, string> = {
 };
 
 export const USER_ACCESS_ROLE_DESCRIPTIONS: Record<UserAccessRole, string> = {
-  admin: "Full access — settings, configuration, employees",
+  admin: "Full access — users, configuration, employees",
   manager: "Create/edit employees, departments & sections (no user management)",
   viewer: "View directory only — cannot add, edit, or delete",
 };

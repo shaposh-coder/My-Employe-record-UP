@@ -28,10 +28,7 @@ export default async function DashboardPage() {
         active={emp.active}
         unActive={emp.unActive}
       />
-      <DashboardDeptSectionStats
-        departmentRows={deptSec.departmentRows}
-        sectionRows={deptSec.sectionRows}
-      />
+      <DashboardDeptSectionStats rows={deptSec.rows} />
     </div>
   );
 }
