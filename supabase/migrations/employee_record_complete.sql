@@ -776,6 +776,8 @@ begin
     v_instance_id := '00000000-0000-0000-0000-000000000000'::uuid;
   end if;
 
+  -- Token columns must be '' not NULL or GoTrue returns "Database error querying schema" on login
+  -- (see https://github.com/supabase/auth/issues/1940 )
   insert into auth.users (
     id,
     instance_id,
@@ -789,6 +791,8 @@ begin
     created_at,
     updated_at,
     confirmation_token,
+    email_change,
+    email_change_token_new,
     recovery_token
   )
   values (
@@ -803,6 +807,8 @@ begin
     jsonb_build_object('full_name', 'Admin'),
     now(),
     now(),
+    '',
+    '',
     '',
     ''
   );
