@@ -1,5 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EmployeeListRow } from "@/components/employees/employee-list-row";
-import { createClient } from "@/lib/supabase/client";
 import { employeeListRowFromDbRow } from "@/lib/employee-list-row-from-db";
 import {
   EMPLOYEE_STATUS,
@@ -65,8 +65,10 @@ function buildSearchOrFilter(token: string): string | null {
 /**
  * Loads one page of employees for the directory table (newest first), with server-side
  * filters, search (`ilike`), and Supabase `.range(from, to)` — never fetches the full table.
+ * Pass a server or browser `SupabaseClient` (RLS applies in both cases).
  */
 export async function fetchEmployees(
+  supabase: SupabaseClient,
   options?: FetchEmployeesOptions,
 ): Promise<{
   rows: EmployeeListRow[];
@@ -79,7 +81,6 @@ export async function fetchEmployees(
   const to = from + pageSize - 1;
 
   try {
-    const supabase = createClient();
     let query = supabase
       .from("employees")
       .select(SELECT_COLUMNS, { count: "exact" })
@@ -128,6 +129,31 @@ export async function fetchEmployees(
       error: e instanceof Error ? e.message : "Could not load employees",
     };
   }
+}
+
+/**
+ * Loads every row matching the same filters as the directory (paginated internally).
+ * Used for CSV export — respects current search / department / section / city / status.
+ */
+export async function fetchAllEmployeesForExport(
+  supabase: SupabaseClient,
+  options: Omit<FetchEmployeesOptions, "page" | "pageSize">,
+): Promise<{ rows: EmployeeListRow[]; error: string | null }> {
+  const chunkSize = 500;
+  const all: EmployeeListRow[] = [];
+  let page = 1;
+  for (;;) {
+    const { rows, error } = await fetchEmployees(supabase, {
+      ...options,
+      page,
+      pageSize: chunkSize,
+    });
+    if (error) return { rows: [], error };
+    all.push(...rows);
+    if (rows.length < chunkSize) break;
+    page += 1;
+  }
+  return { rows: all, error: null };
 }
 
 /** @deprecated Use `fetchEmployees` — alias kept for existing imports. */

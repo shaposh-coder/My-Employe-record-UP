@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { loadUserAccessRowsServer } from "@/lib/actions/user-access-data";
 import {
   USER_ACCESS_ROLE_DESCRIPTIONS,
   USER_ACCESS_ROLE_LABELS,
   USER_ACCESS_ROLES,
   type UserAccessRole,
   type UserAccessRow,
-  fetchUserAccessRows,
   normalizeUserAccessEmail,
 } from "@/lib/user-access";
 
@@ -38,10 +38,21 @@ function roleBadgeClass(role: UserAccessRole): string {
   }
 }
 
-export function UsersAccessSettings() {
-  const [rows, setRows] = useState<UserAccessRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+type UsersAccessSettingsProps = {
+  /** Prefetched on the settings route (server). */
+  directoryPrefetch?: { rows: UserAccessRow[]; error: string | null };
+};
+
+export function UsersAccessSettings({
+  directoryPrefetch,
+}: UsersAccessSettingsProps = {}) {
+  const [rows, setRows] = useState<UserAccessRow[]>(
+    () => directoryPrefetch?.rows ?? [],
+  );
+  const [loading, setLoading] = useState(() => !directoryPrefetch);
+  const [loadError, setLoadError] = useState<string | null>(
+    () => directoryPrefetch?.error ?? null,
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -54,8 +65,7 @@ export function UsersAccessSettings() {
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    const supabase = createClient();
-    const { rows: next, error } = await fetchUserAccessRows(supabase);
+    const { rows: next, error } = await loadUserAccessRowsServer();
     setLoading(false);
     if (error) {
       setLoadError(error);
@@ -66,8 +76,12 @@ export function UsersAccessSettings() {
   }, []);
 
   useEffect(() => {
+    if (directoryPrefetch && !directoryPrefetch.error) {
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [directoryPrefetch, load]);
 
   function openAdd() {
     setEditingId(null);

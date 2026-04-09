@@ -4,6 +4,12 @@ import * as Popover from "@radix-ui/react-popover";
 import { ListFilter, Search, X } from "lucide-react";
 import { memo, useState } from "react";
 import { SearchableSelect } from "./searchable-select";
+import { EMPLOYEE_STATUS } from "@/lib/employee-status";
+
+const STATUS_FILTER_OPTIONS = [
+  EMPLOYEE_STATUS.Active,
+  EMPLOYEE_STATUS.UnActive,
+] as const;
 
 function EmployeesFilterBarInner({
   searchQuery,
@@ -11,9 +17,11 @@ function EmployeesFilterBarInner({
   department,
   section,
   city,
+  status,
   onDepartmentChange,
   onSectionChange,
   onCityChange,
+  onStatusChange,
   departmentOptions,
   sectionOptions,
   cityOptions,
@@ -30,15 +38,18 @@ function EmployeesFilterBarInner({
   department: string;
   section: string;
   city: string;
+  /** Empty string = all statuses. */
+  status: string;
   onDepartmentChange: (value: string) => void;
   onSectionChange: (value: string) => void;
   onCityChange: (value: string) => void;
+  onStatusChange: (value: string) => void;
   departmentOptions: string[];
   sectionOptions: string[];
   cityOptions: string[];
   onClearFilters: () => void;
   hasActiveFilters: boolean;
-  /** Number of active dropdown filters (Department / Section / City). */
+  /** Number of active dropdown filters (Department / Section / City / Status). */
   activeFilterCount: number;
   filterControlsDisabled?: boolean;
   variant?: "default" | "toolbar";
@@ -135,6 +146,14 @@ function EmployeesFilterBarInner({
                 onChange={onCityChange}
                 options={cityOptions}
                 emptyOptionLabel="All cities"
+                disabled={filterControlsDisabled}
+              />
+              <SearchableSelect
+                label="Status"
+                value={status}
+                onChange={onStatusChange}
+                options={[...STATUS_FILTER_OPTIONS]}
+                emptyOptionLabel="All statuses"
                 disabled={filterControlsDisabled}
               />
             </div>

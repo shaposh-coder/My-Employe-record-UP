@@ -1,12 +1,14 @@
-import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Full `employees` row for detail view (all columns). */
-export async function fetchEmployeeFullById(id: string): Promise<{
+export async function fetchEmployeeFullById(
+  supabase: SupabaseClient,
+  id: string,
+): Promise<{
   data: Record<string, unknown> | null;
   error: string | null;
 }> {
   try {
-    const supabase = createClient();
     const { data, error } = await supabase
       .from("employees")
       .select("*")

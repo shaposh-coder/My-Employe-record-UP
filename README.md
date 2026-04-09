@@ -75,21 +75,44 @@ npm install
 
 ### 3. Environment variables
 
-Create a `.env.local` file in the project root (do not commit this file):
+Copy the example file and fill in values from the Supabase dashboard (**Project Settings → API**):
+
+```bash
+cp .env.local.example .env.local
+```
+
+| Variable | Where it runs | Purpose |
+|----------|----------------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Browser & server | Supabase project URL. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser & server | Public anon key (safe to expose in client bundles). |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Server only** | Used by API routes (e.g. creating users with passwords in **Settings**). Never commit real values or expose this key in client code. |
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 ```
 
-- Copy **Project URL** and **anon / public** key from the Supabase dashboard: **Project Settings → API**.
-- Never commit real keys or service role secrets to version control.
+- The **service role** key is optional for read-only use, but **required** if admins should add or remove users with login passwords from the app.
+- Never commit `.env.local` or real secrets to Git.
 
 ### 4. Database setup
 
-SQL migrations live under `supabase/migrations/`. Apply them to your Supabase project in order (e.g. via the Supabase SQL Editor or [Supabase CLI](https://supabase.com/docs/guides/cli)) so that tables such as `employees`, `departments`, `sections`, constraints, RLS policies, and storage policies match the application expectations.
+There is a **single** SQL migration: [`supabase/migrations/employee_record_complete.sql`](./supabase/migrations/employee_record_complete.sql). Apply it **once** on a new Supabase project:
 
-After migrations, ensure the **`employee-docs`** storage bucket (or equivalent configured in your app) exists if you use document uploads.
+1. Open the **Supabase SQL Editor**, create a new query, paste the full file contents, and **Run**; or  
+2. Use the **[Supabase CLI](https://supabase.com/docs/guides/cli)** (`supabase db push` / `supabase db reset` for a linked local project).
+
+The script creates tables, RLS policies, the **`employee-docs`** storage bucket and policies, and seeds a **default admin** for the first login:
+
+| Field | Value |
+|--------|--------|
+| Email | `admin@admin.com` |
+| Password | `admin123` |
+| Full name | Admin |
+| Access | **admin** (`public.user_access`; password stored only as **bcrypt** in `auth.users`) |
+
+Change this password after the first successful sign-in on any shared or production deployment.
 
 ### 5. Run the development server
 
@@ -129,14 +152,15 @@ Employee-Record/
 │   └── providers.tsx               # App-wide providers (e.g. theme)
 ├── hooks/                          # Reusable React hooks (e.g. document upload helpers)
 ├── lib/                            # Services, data layer, and shared logic (no React UI)
-│   ├── supabase/                   # Supabase browser & server clients
+│   ├── supabase/                   # Supabase browser, server, and admin clients
+│   ├── actions/                    # Server Actions (directory data, config refresh, user access)
 │   ├── storage/                    # Storage upload helpers (employee documents)
 │   ├── validations/                # Zod schemas for forms
-│   ├── fetch-*.ts                  # Data fetching for employees, filters, and related APIs
+│   ├── fetch-*.ts                  # Data fetching for employees, filters, configuration
 │   ├── employee-table-columns.ts   # Column visibility & persistence helpers
 │   └── social-links.ts             # Social link keys and normalization
 ├── supabase/
-│   └── migrations/                 # SQL migrations (schema, RLS, storage)
+│   └── migrations/                 # `employee_record_complete.sql` — full schema + default admin
 ├── docs/
 │   └── screenshots/                # Optional README screenshots (see Visuals section)
 ├── public/                         # Static assets
@@ -153,9 +177,36 @@ Employee-Record/
 
 ---
 
-## Deployment
+## Deployment (Vercel)
 
-This application can be deployed on any platform that supports Next.js (e.g. [Vercel](https://vercel.com)). Set the same `NEXT_PUBLIC_*` environment variables in your hosting provider’s project settings. Run `npm run build` to verify the project builds successfully before deploying.
+This app targets **[Vercel](https://vercel.com)** (Next.js–native hosting). Other Node hosts work if they support the Next.js App Router and environment variables.
+
+### Before you push to GitHub
+
+1. Run **`npm run build`** locally and fix any errors.
+2. Confirm **`.env.local`** is listed in **`.gitignore`** (it should be) and never stage real secrets.
+3. Optionally run **`npm run lint`**.
+
+### Connect GitHub → Vercel
+
+1. Push your repository to GitHub.
+2. In Vercel: **Add New… → Project → Import** the repository.
+3. Framework preset should detect **Next.js**. Root directory: project root (default).
+4. Under **Environment Variables**, add the same keys as in `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (production value; **Sensitive** in Vercel)
+5. Deploy. Vercel will run `npm run build` on each push to the connected branch.
+
+### After the first production deploy
+
+1. In **Supabase → Authentication → URL configuration**, set **Site URL** to your Vercel URL (e.g. `https://your-app.vercel.app`) and add the same URL under **Redirect URLs** if you use email links or OAuth later.
+2. Log in with the seeded admin (`admin@admin.com` / `admin123`), then **change the password** and rotate credentials for anything exposed during testing.
+
+### Troubleshooting
+
+- **Build fails on Vercel:** Check the build log; often a missing env var or TypeScript error.
+- **Login works locally but not on Vercel:** Verify `NEXT_PUBLIC_*` values match your Supabase project and Auth URL settings include your production domain.
 
 ---
 

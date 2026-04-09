@@ -75,7 +75,7 @@ Employee-Record/
 
 - Tables: **`departments`**, **`sections`** (titles + descriptions).
 - Employees table par **`department`**, **`section`** text fields — directory rows se **title matching** (`normalize_title_key` SQL / app-side formatting).
-- **`supabase/migrations/20260409100000_directory_employee_counts.sql`**: RPCs **`department_employee_counts()`**, **`section_employee_counts()`** — per-row employee counts.
+- **`supabase/migrations/20260420120000_employee_record_complete.sql`**: full schema + RPCs (**`department_employee_counts()`**, **`section_employee_counts()`**, etc.) + default admin seed.
 - UI: **`components/configuration/department-section-settings.tsx`** — realtime subscriptions, search, modals add/edit, delete guards.
 
 ### 4.4 UI patterns
@@ -87,8 +87,8 @@ Employee-Record/
 
 ## 5. Database (migrations)
 
-- SQL files **`supabase/migrations/`** me hain — naya project ho to order follow karke Supabase SQL Editor / CLI se apply karo.
-- Important pieces: `employees` table, `departments` / `sections`, indexes (`20260408120000_...`), status column, directory count RPCs.
+- **`supabase/migrations/20260420120000_employee_record_complete.sql`** — ek hi file; Supabase SQL Editor / CLI se apply karo.
+- Important pieces: `employees`, `departments` / `sections` (with `department_id`), indexes, RLS, storage, default admin (`admin@admin.com` / bcrypt).
 
 ---
 

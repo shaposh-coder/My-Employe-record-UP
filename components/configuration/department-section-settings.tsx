@@ -24,6 +24,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { refreshConfigurationDirectorySnapshot } from "@/lib/actions/configuration-directory";
+import {
+  formatTitleForStorage,
+  normalizeTitleKey,
+} from "@/lib/configuration/format-directory-title";
 import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
 
 export type DirectoryItem = {
@@ -35,15 +40,6 @@ export type DirectoryItem = {
 export type SectionItem = DirectoryItem & {
   department_id: string;
 };
-
-/** Trim + collapse internal whitespace (so "  IT  " and "IT" match as duplicates). */
-export function formatTitleForStorage(raw: string): string {
-  return raw.trim().replace(/\s+/g, " ");
-}
-
-function normalizeTitleKey(raw: string): string {
-  return formatTitleForStorage(raw).toLowerCase();
-}
 
 function sortByTitle(a: DirectoryItem, b: DirectoryItem) {
   return a.title.localeCompare(b.title);
@@ -1020,57 +1016,35 @@ function DepartmentsWithNestedSections({
   );
 }
 
-type DeptCountRow = { dept_id: string; employee_count: number | string };
-type SecCountRow = { section_id: string; employee_count: number | string };
+type DepartmentSectionSettingsProps = {
+  initialSnapshot?: {
+    departments: DirectoryItem[];
+    sections: SectionItem[];
+    deptCounts: Record<string, number>;
+    secCounts: Record<string, number>;
+    error: string | null;
+  };
+};
 
-function mapCount<T extends Record<string, unknown>>(
-  rows: T[] | null,
-  idKey: string,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const r of rows ?? []) {
-    const id = r[idKey];
-    const c = r.employee_count;
-    if (typeof id === "string") {
-      const n = typeof c === "number" ? c : Number(c);
-      out[id] = Number.isFinite(n) ? n : 0;
-    }
-  }
-  return out;
-}
-
-function buildFallbackCounts(
-  deptRows: DirectoryItem[],
-  secRows: SectionItem[],
-  emps: { department: string | null; section: string | null }[],
-): { dept: Record<string, number>; sec: Record<string, number> } {
-  const deptOut: Record<string, number> = {};
-  const secOut: Record<string, number> = {};
-  for (const row of deptRows) {
-    const key = formatTitleForStorage(row.title);
-    deptOut[row.id] = emps.filter(
-      (e) =>
-        e.department != null &&
-        formatTitleForStorage(e.department) === key,
-    ).length;
-  }
-  for (const row of secRows) {
-    const key = formatTitleForStorage(row.title);
-    secOut[row.id] = emps.filter(
-      (e) =>
-        e.section != null && formatTitleForStorage(e.section) === key,
-    ).length;
-  }
-  return { dept: deptOut, sec: secOut };
-}
-
-export function DepartmentSectionSettings() {
-  const [departments, setDepartments] = useState<DirectoryItem[]>([]);
-  const [sections, setSections] = useState<SectionItem[]>([]);
-  const [deptCounts, setDeptCounts] = useState<Record<string, number>>({});
-  const [secCounts, setSecCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+export function DepartmentSectionSettings({
+  initialSnapshot,
+}: DepartmentSectionSettingsProps = {}) {
+  const [departments, setDepartments] = useState<DirectoryItem[]>(
+    () => initialSnapshot?.departments ?? [],
+  );
+  const [sections, setSections] = useState<SectionItem[]>(
+    () => initialSnapshot?.sections ?? [],
+  );
+  const [deptCounts, setDeptCounts] = useState<Record<string, number>>(
+    () => initialSnapshot?.deptCounts ?? {},
+  );
+  const [secCounts, setSecCounts] = useState<Record<string, number>>(
+    () => initialSnapshot?.secCounts ?? {},
+  );
+  const [loading, setLoading] = useState(() => !initialSnapshot);
+  const [loadError, setLoadError] = useState<string | null>(
+    () => initialSnapshot?.error ?? null,
+  );
   const [employeeListModal, setEmployeeListModal] = useState<{
     field: "department" | "section";
     item: DirectoryItem;
@@ -1082,61 +1056,23 @@ export function DepartmentSectionSettings() {
   );
 
   const loadDirectorySnapshot = useCallback(async () => {
-    const supabase = createClient();
     setLoadError(null);
-
-    const [dRes, sRes] = await Promise.all([
-      supabase.from("departments").select("*").order("title"),
-      supabase.from("sections").select("*").order("title"),
-    ]);
-
-    if (dRes.error) {
-      setLoadError(dRes.error.message);
+    const result = await refreshConfigurationDirectorySnapshot();
+    if (result.error) {
+      setLoadError(result.error);
       return;
     }
-    if (sRes.error) {
-      setLoadError(sRes.error.message);
-      return;
-    }
-
-    const deptRows = ((dRes.data as DirectoryItem[]) ?? [])
-      .slice()
-      .sort(sortByTitle);
-    const secRows = ((sRes.data as SectionItem[]) ?? [])
-      .slice()
-      .sort(sortByTitle);
-    setDepartments(deptRows);
-    setSections(secRows);
-
-    const [dcRes, scRes] = await Promise.all([
-      supabase.rpc("department_employee_counts"),
-      supabase.rpc("section_employee_counts"),
-    ]);
-
-    if (!dcRes.error && dcRes.data != null && !scRes.error && scRes.data != null) {
-      setDeptCounts(mapCount(dcRes.data as DeptCountRow[], "dept_id"));
-      setSecCounts(mapCount(scRes.data as SecCountRow[], "section_id"));
-      return;
-    }
-
-    const { data: emps, error: empErr } = await supabase
-      .from("employees")
-      .select("department, section");
-    if (empErr) {
-      setDeptCounts({});
-      setSecCounts({});
-      return;
-    }
-    const list = (emps ?? []) as {
-      department: string | null;
-      section: string | null;
-    }[];
-    const { dept, sec } = buildFallbackCounts(deptRows, secRows, list);
-    setDeptCounts(dept);
-    setSecCounts(sec);
+    setDepartments(result.departments as DirectoryItem[]);
+    setSections(result.sections as SectionItem[]);
+    setDeptCounts(result.deptCounts);
+    setSecCounts(result.secCounts);
   }, []);
 
   useEffect(() => {
+    if (initialSnapshot) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     async function boot() {
       setLoading(true);
@@ -1148,7 +1084,7 @@ export function DepartmentSectionSettings() {
     return () => {
       cancelled = true;
     };
-  }, [loadDirectorySnapshot]);
+  }, [initialSnapshot, loadDirectorySnapshot]);
 
   const scheduleEmployeeRefresh = useCallback(() => {
     if (employeeDebounceRef.current) {

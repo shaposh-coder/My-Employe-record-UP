@@ -22,9 +22,12 @@ import {
   CNIC_FORMAT_REGEX,
   formatCnicInput,
   formatPhoneInput,
-  normalizeCnicFromDb,
-  normalizePhoneFromDb,
 } from "@/lib/format-cnic-phone";
+import { employeeDbRowToFormValues } from "@/lib/employee-db-row-to-form-values";
+import type {
+  FormDepartmentOptionRow,
+  FormSectionOptionRow,
+} from "@/lib/fetch-form-departments-sections";
 import {
   DUPLICATE_MSG,
   isEmployeeCnicTaken,
@@ -140,25 +143,51 @@ const SOCIAL_PLATFORM_FIELDS: {
 
 type AddEmployeeFormProps = {
   editEmployeeId?: string;
+  /** Prefetched on the edit route so the form renders with data immediately (no client fetch). */
+  initialEmployee?: AddEmployeeFormValues;
+  /** From server on /employees/new and /edit — avoids client round-trip for combobox options. */
+  initialDepartments?: FormDepartmentOptionRow[];
+  initialSections?: FormSectionOptionRow[];
+  initialConfigError?: string | null;
 };
 
-function extractAdditionalDocUrl(other: unknown): string {
-  if (!Array.isArray(other) || other.length === 0) return "";
-  const first = other[0] as { url?: string };
-  return typeof first?.url === "string" ? first.url : "";
-}
-
-export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
+export function AddEmployeeForm({
+  editEmployeeId,
+  initialEmployee,
+  initialDepartments,
+  initialSections,
+  initialConfigError,
+}: AddEmployeeFormProps) {
   const router = useRouter();
-  const [loadingEmployee, setLoadingEmployee] = useState(!!editEmployeeId);
+  const [loadingEmployee, setLoadingEmployee] = useState(() =>
+    Boolean(editEmployeeId && !initialEmployee),
+  );
   const [draftId, setDraftId] = useState(() => editEmployeeId ?? crypto.randomUUID());
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("personal");
   const tabScrollRef = useRef<HTMLDivElement>(null);
-  const [departments, setDepartments] = useState<ConfigOptionRow[]>([]);
-  const [sections, setSections] = useState<SectionOptionRow[]>([]);
-  const [configLoading, setConfigLoading] = useState(true);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const serverOptionsOk =
+    initialDepartments !== undefined &&
+    initialSections !== undefined &&
+    !initialConfigError;
+  const [departments, setDepartments] = useState<ConfigOptionRow[]>(
+    () => initialDepartments ?? [],
+  );
+  const [sections, setSections] = useState<SectionOptionRow[]>(
+    () => initialSections ?? [],
+  );
+  const [configLoading, setConfigLoading] = useState(() => !serverOptionsOk);
+  const [configError, setConfigError] = useState<string | null>(
+    () => initialConfigError ?? null,
+  );
+
+  const formDefaultValues = useMemo(
+    () =>
+      editEmployeeId && initialEmployee
+        ? { ...defaultValues, ...initialEmployee }
+        : defaultValues,
+    [editEmployeeId, initialEmployee],
+  );
 
   const {
     register,
@@ -173,7 +202,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
     formState: { errors, isSubmitting },
   } = useForm<AddEmployeeFormValues>({
     resolver: zodResolver(addEmployeeSchema),
-    defaultValues,
+    defaultValues: formDefaultValues,
   });
 
   const values = watch();
@@ -275,6 +304,11 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
       setLoadingEmployee(false);
       return;
     }
+    if (initialEmployee) {
+      setDraftId(id);
+      setLoadingEmployee(false);
+      return;
+    }
     const employeeId: string = id;
     let cancelled = false;
     const supabase = createClient();
@@ -294,47 +328,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
         return;
       }
       const d = data as Record<string, unknown>;
-      const sl = (d.social_links as Record<string, string | null> | null) ?? {};
-      reset({
-        full_name: String(d.full_name ?? ""),
-        status:
-          d.status === EMPLOYEE_STATUS.UnActive || d.status === "Deactive"
-            ? EMPLOYEE_STATUS.UnActive
-            : EMPLOYEE_STATUS.Active,
-        father_name: (() => {
-          const a = String(d.father_name ?? "").trim();
-          const b = String(d.family_father_name ?? "").trim();
-          return a || b;
-        })(),
-        dob: String(d.dob ?? ""),
-        cnic_no: normalizeCnicFromDb(String(d.cnic_no ?? "")),
-        ss_eubi_no: String(d.ss_eubi_no ?? ""),
-        phone_no: normalizePhoneFromDb(String(d.phone_no ?? "")),
-        city: String(d.city ?? ""),
-        address: String(d.address ?? ""),
-        department: String(d.department ?? ""),
-        section: String(d.section ?? ""),
-        education: String(d.education ?? ""),
-        experience: String(d.experience ?? ""),
-        social_instagram: String(sl.instagram ?? ""),
-        social_facebook: String(sl.facebook ?? ""),
-        social_tiktok: String(sl.tiktok ?? ""),
-        social_youtube: String(sl.youtube ?? ""),
-        social_snapchat: String(sl.snapchat ?? ""),
-        social_twitter: String(sl.twitter ?? ""),
-        email_address: String(d.email_address ?? ""),
-        reference_info: String(d.reference_info ?? ""),
-        family_cnic: normalizeCnicFromDb(String(d.family_cnic ?? "")),
-        family_phone: normalizePhoneFromDb(String(d.family_phone ?? "")),
-        family_phone_alt: normalizePhoneFromDb(String(d.family_phone_alt ?? "")),
-        profile_image: String(d.profile_image ?? ""),
-        cnic_front: String(d.cnic_front ?? ""),
-        cnic_back: String(d.cnic_back ?? ""),
-        father_image: String(d.father_image ?? ""),
-        father_cnic_front: String(d.father_cnic_front ?? ""),
-        father_cnic_back: String(d.father_cnic_back ?? ""),
-        additional_document: extractAdditionalDocUrl(d.other_documents),
-      });
+      reset(employeeDbRowToFormValues(d));
       setDraftId(employeeId);
       setLoadingEmployee(false);
     }
@@ -343,9 +337,12 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
     return () => {
       cancelled = true;
     };
-  }, [editEmployeeId, reset, router]);
+  }, [editEmployeeId, initialEmployee, reset, router]);
 
   useEffect(() => {
+    if (serverOptionsOk) {
+      return;
+    }
     let cancelled = false;
     const supabase = createClient();
 
@@ -374,7 +371,7 @@ export function AddEmployeeForm({ editEmployeeId }: AddEmployeeFormProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [serverOptionsOk]);
 
   function docFolder(field: DocFieldKey) {
     return `drafts/${draftId}/${DOC_SLUGS[field]}`;

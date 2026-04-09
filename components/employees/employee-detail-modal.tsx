@@ -17,7 +17,7 @@ import {
   type SocialLinkKey,
   type SocialLinksRecord,
 } from "@/lib/social-links";
-import { fetchEmployeeFullById } from "@/lib/fetch-employee-by-id";
+import { loadEmployeeFullForModal } from "@/lib/actions/employees-data";
 import { SocialPlatformIcon } from "./social-platform-icons";
 
 const TABS = [
@@ -156,7 +156,7 @@ export function EmployeeDetailModal({
     if (!employeeId) return;
     setLoading(true);
     setError(null);
-    const { data, error: err } = await fetchEmployeeFullById(employeeId);
+    const { data, error: err } = await loadEmployeeFullForModal(employeeId);
     setLoading(false);
     if (err || !data) {
       setRow(null);
