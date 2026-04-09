@@ -249,6 +249,7 @@ function buildColumnDefs(
         <EmployeeRowActionsMenu
           row={row}
           onDelete={onDelete}
+          onView={onEmployeeNameClick}
           onToggleStatus={onToggleStatus}
           statusUpdatingId={statusUpdatingId}
         />

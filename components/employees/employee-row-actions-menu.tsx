@@ -9,17 +9,20 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Loader2, MoreVertical, Pencil, Power, Trash2 } from "lucide-react";
+import { Eye, Loader2, MoreVertical, Pencil, Power, Trash2 } from "lucide-react";
 import type { EmployeeListRow } from "./employee-list-row";
 
 export function EmployeeRowActionsMenu({
   row,
   onDelete,
+  onView,
   onToggleStatus,
   statusUpdatingId,
 }: {
   row: EmployeeListRow;
   onDelete: (id: string) => void | Promise<void>;
+  /** Opens the same employee detail modal as name / profile image. */
+  onView?: (id: string) => void;
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   statusUpdatingId?: string | null;
 }) {
@@ -97,6 +100,20 @@ export function EmployeeRowActionsMenu({
         <Pencil className="h-4 w-4 shrink-0" strokeWidth={2} />
         Edit
       </Link>
+      {onView ? (
+        <button
+          type="button"
+          role="menuitem"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-700/80"
+          onClick={() => {
+            close();
+            onView(row.id);
+          }}
+        >
+          <Eye className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+          View
+        </button>
+      ) : null}
       {onToggleStatus ? (
         <button
           type="button"
