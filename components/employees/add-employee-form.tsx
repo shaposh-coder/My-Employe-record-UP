@@ -821,7 +821,7 @@ export function AddEmployeeForm({
                 </div>
                 <div>
                   <label htmlFor="ss_eubi_no" className={labelClass}>
-                    SS / EUBI number
+                    SS / EOBI number
                   </label>
                   <input
                     id="ss_eubi_no"

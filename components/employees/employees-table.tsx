@@ -149,7 +149,7 @@ function buildColumnDefs(
     },
     {
       id: "ss_eubi",
-      header: "SOCIAL SECURITY / EUBI",
+      header: "SOCIAL SECURITY / EOBI",
       cell: (row) => fmt(row.ss_eubi_no),
     },
     {

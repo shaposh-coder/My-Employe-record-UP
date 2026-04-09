@@ -328,7 +328,7 @@ export function EmployeeDetailModal({
                   <Field label="Father’s name" value={row.father_name} />
                   <Field label="Date of birth" value={row.dob} />
                   <Field label="CNIC / national ID" value={row.cnic_no} mono />
-                  <Field label="SS / EUBI number" value={row.ss_eubi_no} />
+                  <Field label="SS / EOBI number" value={row.ss_eubi_no} />
                   <Field label="Phone number" value={row.phone_no} />
                   <Field label="City" value={row.city} />
                   <Field label="Address" value={row.address} />

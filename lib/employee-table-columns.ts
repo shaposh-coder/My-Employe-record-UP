@@ -65,7 +65,7 @@ export const EMPLOYEE_COLUMN_LABELS: Record<EmployeeColumnId, string> = {
   father_name: "FATHER NAME",
   dob: "DATE OF BIRTH",
   cnic: "CNIC#",
-  ss_eubi: "SOCIAL SECURITY / EUBI",
+  ss_eubi: "SOCIAL SECURITY / EOBI",
   phone: "PHONE NUMBER",
   city: "CITY",
   department: "DEPARTMENT",
