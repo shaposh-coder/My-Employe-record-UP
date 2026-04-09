@@ -17,6 +17,13 @@ type SearchableComboboxProps = {
   emptyMessage: string;
   searchPlaceholder: string;
   "aria-invalid"?: boolean;
+  /**
+   * When true, closing the list commits the current typed text even if it is not in `options`.
+   * Use with `options` built from suggestions (e.g. cities).
+   */
+  allowCustomValue?: boolean;
+  /** Tailwind classes for list max height + scroll (default ~15rem). */
+  listMaxHeightClass?: string;
 };
 
 export function SearchableCombobox({
@@ -31,13 +38,16 @@ export function SearchableCombobox({
   emptyMessage,
   searchPlaceholder,
   "aria-invalid": ariaInvalid,
+  allowCustomValue = false,
+  listMaxHeightClass = "max-h-60",
 }: SearchableComboboxProps) {
   const listId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const optionPickedRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const isDisabled = disabled || loading || options.length === 0;
+  const isDisabled =
+    disabled || loading || (!allowCustomValue && options.length === 0);
   const q = query.trim().toLowerCase();
   const filtered =
     q === ""
@@ -51,26 +61,13 @@ export function SearchableCombobox({
 
   const selectOption = useCallback(
     (title: string) => {
+      optionPickedRef.current = true;
       onChange(title);
       close();
       onBlur();
     },
     [onChange, onBlur, close],
   );
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
-        close();
-      }
-    }
-    document.addEventListener("mousedown", onDocMouseDown);
-    return () => document.removeEventListener("mousedown", onDocMouseDown);
-  }, [open, close]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,6 +81,16 @@ export function SearchableCombobox({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, close]);
 
+  function handleInputBlur() {
+    if (!optionPickedRef.current && allowCustomValue) {
+      onChange(query.trim());
+    }
+    optionPickedRef.current = false;
+    setOpen(false);
+    setQuery("");
+    onBlur();
+  }
+
   const displayValue = open ? query : value;
 
   const inputClassTrimmed = inputClassName
@@ -91,7 +98,7 @@ export function SearchableCombobox({
     .trim();
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative">
       <div className="relative mt-1.5">
         <input
           id={id}
@@ -119,12 +126,9 @@ export function SearchableCombobox({
           onFocus={() => {
             if (isDisabled) return;
             setOpen(true);
-            setQuery("");
+            setQuery(allowCustomValue ? value : "");
           }}
-          onBlur={() => {
-            close();
-            onBlur();
-          }}
+          onBlur={handleInputBlur}
         />
         <ChevronDown
           className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-500 dark:text-slate-400"
@@ -135,7 +139,7 @@ export function SearchableCombobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-600 dark:bg-slate-950"
+          className={`absolute left-0 right-0 z-50 mt-1 w-full overflow-y-auto overflow-x-hidden rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg dark:border-slate-600 dark:bg-slate-950 ${listMaxHeightClass}`}
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 text-slate-500 dark:text-slate-400">

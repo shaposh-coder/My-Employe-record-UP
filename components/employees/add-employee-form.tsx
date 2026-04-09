@@ -24,6 +24,7 @@ import {
   formatPhoneInput,
 } from "@/lib/format-cnic-phone";
 import { employeeDbRowToFormValues } from "@/lib/employee-db-row-to-form-values";
+import { PAKISTAN_CITIES } from "@/lib/pakistan-cities";
 import type {
   FormDepartmentOptionRow,
   FormSectionOptionRow,
@@ -234,6 +235,15 @@ export function AddEmployeeForm({
     sectionOptionsForDepartment,
     setValue,
   ]);
+
+  const cityComboOptions = useMemo(
+    () =>
+      PAKISTAN_CITIES.map((c, i) => ({
+        id: `pk-city-${i}`,
+        title: c,
+      })),
+    [],
+  );
 
   const [cnicDuplicateBlocked, setCnicDuplicateBlocked] = useState(false);
   const [cnicLookupPending, setCnicLookupPending] = useState(false);
@@ -820,6 +830,7 @@ export function AddEmployeeForm({
                     {...register("ss_eubi_no")}
                   />
                 </div>
+                {renderDepartmentSectionFields("personal")}
                 <div>
                   <label htmlFor="phone_no" className={labelClass}>
                     Phone number
@@ -857,12 +868,27 @@ export function AddEmployeeForm({
                     City
                     <ReqStar />
                   </label>
-                  <input
-                    id="city"
-                    type="text"
-                    autoComplete="address-level2"
-                    className={inputClass}
-                    {...register("city")}
+                  <Controller
+                    name="city"
+                    control={control}
+                    render={({ field }) => (
+                      <SearchableCombobox
+                        id="city"
+                        options={cityComboOptions}
+                        value={field.value ?? ""}
+                        onChange={(v) => field.onChange(v)}
+                        onBlur={() => {
+                          field.onBlur();
+                          void trigger("city");
+                        }}
+                        inputClassName={inputClass}
+                        emptyMessage="No cities in list"
+                        searchPlaceholder="Search or select city"
+                        allowCustomValue
+                        listMaxHeightClass="max-h-[11rem]"
+                        aria-invalid={Boolean(errors.city)}
+                      />
+                    )}
                   />
                   {errors.city ? (
                     <p className={errorClass} role="alert">
@@ -887,7 +913,6 @@ export function AddEmployeeForm({
                     </p>
                   ) : null}
                 </div>
-                {renderDepartmentSectionFields("personal")}
               </div>
             </div>
 
