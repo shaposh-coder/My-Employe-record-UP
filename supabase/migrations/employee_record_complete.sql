@@ -104,6 +104,9 @@ create table if not exists public.employees (
   address text,
   department text not null,
   section text,
+  date_of_joining text,
+  date_of_resign text,
+  designation text,
   status text not null default 'Active',
   education text,
   experience text,
@@ -140,6 +143,9 @@ alter table public.employees add column if not exists city text;
 alter table public.employees add column if not exists address text;
 alter table public.employees add column if not exists department text;
 alter table public.employees add column if not exists section text;
+alter table public.employees add column if not exists date_of_joining text;
+alter table public.employees add column if not exists date_of_resign text;
+alter table public.employees add column if not exists designation text;
 alter table public.employees add column if not exists status text;
 alter table public.employees add column if not exists education text;
 alter table public.employees add column if not exists experience text;

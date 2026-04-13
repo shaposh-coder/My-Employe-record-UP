@@ -39,6 +39,9 @@ export const EMPLOYEES_CSV_HEADERS = [
   "Address",
   "Department",
   "Section",
+  "Date of Joining",
+  "Date of Resign",
+  "Designation",
   "Education",
   "Experience",
   ...SOCIAL_HEADERS,
@@ -71,6 +74,11 @@ const HEADER_ALIASES: Record<string, EmployeesCsvHeaderKey> = {
   address: "Address",
   department: "Department",
   section: "Section",
+  "date of joining": "Date of Joining",
+  date_of_joining: "Date of Joining",
+  "date of resign": "Date of Resign",
+  date_of_resign: "Date of Resign",
+  designation: "Designation",
   education: "Education",
   experience: "Experience",
   email: "Email",
@@ -150,6 +158,9 @@ export function employeeRowToCsvValues(row: EmployeeListRow): string[] {
     row.address ?? "",
     row.department,
     row.section ?? "",
+    row.date_of_joining ?? "",
+    row.date_of_resign ?? "",
+    row.designation ?? "",
     row.education ?? "",
     row.experience ?? "",
     ...SOCIAL_LINK_KEYS.map((k) => socialCell(row, k)),
@@ -325,6 +336,9 @@ export function csvRowToEmployeePatch(
   set("address", byHeader["Address"]);
   set("department", byHeader["Department"]);
   set("section", byHeader["Section"]);
+  set("date_of_joining", byHeader["Date of Joining"]);
+  set("date_of_resign", byHeader["Date of Resign"]);
+  set("designation", byHeader["Designation"]);
   set("education", byHeader["Education"]);
   set("experience", byHeader["Experience"]);
   set("email_address", byHeader["Email"]);

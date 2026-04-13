@@ -340,6 +340,9 @@ export function EmployeeDetailModal({
                 <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
                   <Field label="Department" value={row.department} />
                   <Field label="Section" value={row.section} />
+                  <Field label="Date of joining" value={row.date_of_joining} />
+                  <Field label="Date of resign" value={row.date_of_resign} />
+                  <Field label="Designation" value={row.designation} />
                   <Field label="Education" value={row.education} />
                   <div className="sm:col-span-2">
                     <Field label="Experience" value={row.experience} />

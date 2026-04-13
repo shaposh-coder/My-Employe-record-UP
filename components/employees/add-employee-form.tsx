@@ -53,6 +53,9 @@ const defaultValues: AddEmployeeFormValues = {
   address: "",
   department: "",
   section: "",
+  date_of_joining: "",
+  date_of_resign: "",
+  designation: "",
   education: "",
   experience: "",
   social_instagram: "",
@@ -528,6 +531,9 @@ export function AddEmployeeForm({
       address: data.address || null,
       department: data.department,
       section: data.section || null,
+      date_of_joining: data.date_of_joining.trim() || null,
+      date_of_resign: data.date_of_resign.trim() || null,
+      designation: data.designation?.trim() || null,
       status: data.status,
       education: data.education || null,
       experience: data.experience || null,
@@ -550,7 +556,7 @@ export function AddEmployeeForm({
     };
 
     const selectCols =
-      "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, basic_salary, phone_no, city, department, section, status, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt";
+      "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, basic_salary, phone_no, city, department, section, date_of_joining, date_of_resign, designation, status, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt";
 
     if (editEmployeeId) {
       const { data: updated, error } = await supabase
@@ -950,6 +956,61 @@ export function AddEmployeeForm({
             >
               <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
                 {renderDepartmentSectionFields("work")}
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:col-span-2 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="date_of_joining" className={labelClass}>
+                      Date of joining
+                    </label>
+                    <input
+                      id="date_of_joining"
+                      type="date"
+                      className={inputClass}
+                      aria-invalid={Boolean(errors.date_of_joining)}
+                      {...register("date_of_joining")}
+                    />
+                    {errors.date_of_joining ? (
+                      <p className={errorClass} role="alert">
+                        {errors.date_of_joining.message}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label htmlFor="date_of_resign" className={labelClass}>
+                      Date of resign
+                    </label>
+                    <input
+                      id="date_of_resign"
+                      type="date"
+                      className={inputClass}
+                      aria-invalid={Boolean(errors.date_of_resign)}
+                      {...register("date_of_resign")}
+                    />
+                    {errors.date_of_resign ? (
+                      <p className={errorClass} role="alert">
+                        {errors.date_of_resign.message}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label htmlFor="designation" className={labelClass}>
+                      Designation
+                    </label>
+                    <input
+                      id="designation"
+                      type="text"
+                      autoComplete="organization-title"
+                      placeholder="e.g. Senior Operator"
+                      className={inputClass}
+                      aria-invalid={Boolean(errors.designation)}
+                      {...register("designation")}
+                    />
+                    {errors.designation ? (
+                      <p className={errorClass} role="alert">
+                        {errors.designation.message}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
                 <div className="sm:col-span-2">
                   <label htmlFor="education" className={labelClass}>
                     Education

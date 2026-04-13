@@ -11,7 +11,7 @@ export type { EmployeeStoredStatus };
 export { parseEmployeesStatusQueryParam };
 
 const SELECT_COLUMNS =
-  "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, basic_salary, phone_no, city, department, section, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt, status";
+  "id, profile_image, full_name, father_name, dob, cnic_no, ss_eubi_no, basic_salary, phone_no, city, department, section, date_of_joining, date_of_resign, designation, education, address, experience, social_media_link, social_links, email_address, reference_info, family_name, family_father_name, family_cnic, family_phone, family_phone_alt, status";
 
 /** Allowed “per page” values for the employee directory. */
 export const EMPLOYEES_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;

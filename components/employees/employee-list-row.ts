@@ -16,6 +16,10 @@ export type EmployeeListRow = {
   city: string | null;
   department: string;
   section: string | null;
+  /** Work & education tab — YYYY-MM-DD or empty */
+  date_of_joining: string | null;
+  date_of_resign: string | null;
+  designation: string | null;
   education: string | null;
   address: string | null;
   experience: string | null;
