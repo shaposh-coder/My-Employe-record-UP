@@ -2,13 +2,15 @@ import { DashboardDeptSectionStats } from "@/components/dashboard/dashboard-dept
 import { DashboardEmployeeStats } from "@/components/dashboard/dashboard-employee-stats";
 import { fetchDashboardDeptSectionBreakdown } from "@/lib/dashboard-dept-section-counts";
 import { fetchDashboardEmployeeCounts } from "@/lib/dashboard-employee-counts";
+import { fetchAllowedDepartmentForSession } from "@/lib/fetch-allowed-department-for-session";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const scope = await fetchAllowedDepartmentForSession(supabase);
   const [emp, deptSec] = await Promise.all([
-    fetchDashboardEmployeeCounts(supabase),
-    fetchDashboardDeptSectionBreakdown(supabase),
+    fetchDashboardEmployeeCounts(supabase, { department: scope }),
+    fetchDashboardDeptSectionBreakdown(supabase, { department: scope }),
   ]);
 
   const loadError = [emp.error, deptSec.error].filter(Boolean).join(" — ");

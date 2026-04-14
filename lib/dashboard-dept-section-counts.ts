@@ -64,7 +64,12 @@ function breakdownSectionForDepartment(
 
 export async function fetchDashboardDeptSectionBreakdown(
   supabase: SupabaseClient,
+  options?: { department?: string | null },
 ): Promise<DashboardDeptSectionBreakdown> {
+  const scope = options?.department?.trim();
+  let empQuery = supabase.from("employees").select("department, section, status");
+  if (scope) empQuery = empQuery.eq("department", scope);
+
   const [deptRes, secRes, empRes] = await Promise.all([
     supabase
       .from("departments")
@@ -74,7 +79,7 @@ export async function fetchDashboardDeptSectionBreakdown(
       .from("sections")
       .select("department_id, title")
       .order("title", { ascending: true }),
-    supabase.from("employees").select("department, section, status"),
+    empQuery,
   ]);
 
   const err =
@@ -87,12 +92,19 @@ export async function fetchDashboardDeptSectionBreakdown(
     return { rows: [], error: err };
   }
 
-  const departments = (deptRes.data ?? []) as { id: string; title: string }[];
+  let departments = (deptRes.data ?? []) as { id: string; title: string }[];
   const sections = (secRes.data ?? []) as {
     department_id: string;
     title: string;
   }[];
   const employees = (empRes.data ?? []) as EmpSlice[];
+
+  if (scope) {
+    const sk = normalizeTitleKey(scope);
+    departments = departments.filter(
+      (d) => normalizeTitleKey(d.title) === sk,
+    );
+  }
 
   const rows: DepartmentWithNestedSections[] = departments.map((d) => {
     const base = breakdownForTitles([{ title: d.title }], employees, "department")[0];

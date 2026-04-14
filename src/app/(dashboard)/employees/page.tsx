@@ -6,6 +6,7 @@ import {
   DEFAULT_EMPLOYEES_PAGE_SIZE,
   fetchEmployees,
 } from "@/lib/fetch-employees";
+import { fetchAllowedDepartmentForSession } from "@/lib/fetch-allowed-department-for-session";
 import { fetchEmployeeFilterOptions } from "@/lib/fetch-employee-filter-options";
 import { parseEmployeesStatusQueryParam } from "@/lib/employee-status";
 import { defaultColumnVisibility } from "@/lib/employee-table-columns";
@@ -25,16 +26,18 @@ export default async function EmployeesPage({ searchParams }: PageProps) {
   const status = parseEmployeesStatusQueryParam(statusParam);
 
   const supabase = await createClient();
+  const scope = await fetchAllowedDepartmentForSession(supabase);
   const [listRes, filterOpts] = await Promise.all([
     fetchEmployees(supabase, {
       page: 1,
       pageSize: DEFAULT_EMPLOYEES_PAGE_SIZE,
+      accessScopeDepartment: scope,
       department: department.trim() || undefined,
       section: section.trim() || undefined,
       city: city.trim() || undefined,
       status: status || undefined,
     }),
-    fetchEmployeeFilterOptions(supabase),
+    fetchEmployeeFilterOptions(supabase, { departmentScope: scope }),
   ]);
 
   return (

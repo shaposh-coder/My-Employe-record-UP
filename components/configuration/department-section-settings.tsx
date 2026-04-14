@@ -27,8 +27,9 @@ import { createClient } from "@/lib/supabase/client";
 import { refreshConfigurationDirectorySnapshot } from "@/lib/actions/configuration-directory";
 import {
   formatTitleForStorage,
-  normalizeTitleKey,
+  normalizeTitleKey as normalizeDirectoryTitleKey,
 } from "@/lib/configuration/format-directory-title";
+import { normalizeTitleKey } from "@/lib/normalize-title-key";
 import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
 
 export type DirectoryItem = {
@@ -43,6 +44,15 @@ export type SectionItem = DirectoryItem & {
 
 function sortByTitle(a: DirectoryItem, b: DirectoryItem) {
   return a.title.localeCompare(b.title);
+}
+
+function departmentMatchesConfigScope(
+  dept: DirectoryItem | null | undefined,
+  scopeKey: string | null,
+): boolean {
+  if (!scopeKey) return true;
+  if (!dept?.title) return false;
+  return normalizeTitleKey(dept.title) === scopeKey;
 }
 
 /**
@@ -309,7 +319,7 @@ function ItemFormModal({
   }, [open, onClose, saving]);
 
   const titleKey = useMemo(
-    () => normalizeTitleKey(formTitle),
+    () => normalizeDirectoryTitleKey(formTitle),
     [formTitle],
   );
 
@@ -317,7 +327,7 @@ function ItemFormModal({
     if (!titleKey) return false;
     return items.some((it) => {
       if (excludeId !== null && it.id === excludeId) return false;
-      return normalizeTitleKey(it.title) === titleKey;
+      return normalizeDirectoryTitleKey(it.title) === titleKey;
     });
   }, [items, titleKey, excludeId]);
 
@@ -498,11 +508,14 @@ function DepartmentsWithNestedSections({
   onDeleteSection,
   onShowDeptEmployees,
   onShowSecEmployees,
+  lockDepartmentManagement,
 }: {
   departments: DirectoryItem[];
   sections: SectionItem[];
   deptCounts: Record<string, number>;
   secCounts: Record<string, number>;
+  /** When true (manager with assigned department): hide add/edit/delete department; sections only. */
+  lockDepartmentManagement?: boolean;
   onAddDepartment: (item: {
     title: string;
     description: string;
@@ -522,8 +535,9 @@ function DepartmentsWithNestedSections({
   ) => void | Promise<void>;
   onDeleteSection: (id: string) => void | Promise<void>;
   onShowDeptEmployees: (item: DirectoryItem) => void;
-  onShowSecEmployees: (item: DirectoryItem) => void;
+   onShowSecEmployees: (item: DirectoryItem) => void;
 }) {
+  const deptCrudLocked = Boolean(lockDepartmentManagement);
   const [deptAddOpen, setDeptAddOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [deptEditState, setDeptEditState] = useState<{
@@ -640,17 +654,21 @@ function DepartmentsWithNestedSections({
             Departments &amp; sections
           </h2>
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            Choose a department, then add or edit its sections
+            {deptCrudLocked
+              ? "Add or edit sections for your department only"
+              : "Choose a department, then add or edit its sections"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setDeptAddOpen(true)}
-          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-medium text-white shadow-md shadow-violet-500/25 transition hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-lg dark:shadow-violet-900/40"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
-          Add department
-        </button>
+        {deptCrudLocked ? null : (
+          <button
+            type="button"
+            onClick={() => setDeptAddOpen(true)}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 text-sm font-medium text-white shadow-md shadow-violet-500/25 transition hover:from-violet-500 hover:to-fuchsia-500 hover:shadow-lg dark:shadow-violet-900/40"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+            Add department
+          </button>
+        )}
       </div>
 
       <div className="border-b border-slate-100 p-3 dark:border-slate-800 sm:px-6" role="search">
@@ -737,10 +755,20 @@ function DepartmentsWithNestedSections({
             </p>
             {departments.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
-                No departments yet — use{" "}
-                <span className="font-semibold text-violet-600 dark:text-violet-400">
-                  Add department
-                </span>
+                {deptCrudLocked ? (
+                  <>
+                    Your assigned department was not found in Configuration.
+                    Ask an admin to check the department name or your access
+                    settings.
+                  </>
+                ) : (
+                  <>
+                    No departments yet — use{" "}
+                    <span className="font-semibold text-violet-600 dark:text-violet-400">
+                      Add department
+                    </span>
+                  </>
+                )}
               </p>
             ) : filteredDepartments.length === 0 ? (
               <p className="rounded-2xl border border-dashed border-amber-200/80 bg-amber-50/50 px-3 py-6 text-center text-sm text-amber-900/80 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100/90">
@@ -830,46 +858,58 @@ function DepartmentsWithNestedSections({
                         </button>
                       </div>
                       <div className="flex shrink-0 gap-2 self-end sm:self-start">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setDeptEditState({
-                              id: selectedDept.id,
-                              item: selectedDept,
-                            })
-                          }
-                          className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-violet-700 dark:hover:bg-violet-950/50"
-                        >
-                          <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!selectedDeptMeta.canDeleteDept}
-                          title={
-                            selectedDeptMeta.deptDeleteBlocked
-                              ? `${selectedDeptMeta.dn} employee(s) on this department`
-                              : selectedDeptMeta.childHasEmployees
-                                ? "A section still has employees"
-                                : "Delete department"
-                          }
-                          onClick={() => {
-                            if (!selectedDeptMeta.canDeleteDept) return;
-                            const ok = window.confirm(
-                              `Delete “${selectedDept.title}” and all its sections? This cannot be undone.`,
-                            );
-                            if (ok) void onDeleteDepartment(selectedDept.id);
-                          }}
-                          className={[
-                            "inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition",
-                            !selectedDeptMeta.canDeleteDept
-                              ? "cursor-not-allowed border border-slate-100 text-slate-300 opacity-60 dark:border-slate-800 dark:text-slate-600"
-                              : "border border-red-200/80 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70",
-                          ].join(" ")}
-                        >
-                          <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
-                          Delete
-                        </button>
+                        {deptCrudLocked ? null : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDeptEditState({
+                                  id: selectedDept.id,
+                                  item: selectedDept,
+                                })
+                              }
+                              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-violet-200 hover:bg-violet-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-violet-700 dark:hover:bg-violet-950/50"
+                            >
+                              <Pencil
+                                className="h-4 w-4"
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!selectedDeptMeta.canDeleteDept}
+                              title={
+                                selectedDeptMeta.deptDeleteBlocked
+                                  ? `${selectedDeptMeta.dn} employee(s) on this department`
+                                  : selectedDeptMeta.childHasEmployees
+                                    ? "A section still has employees"
+                                    : "Delete department"
+                              }
+                              onClick={() => {
+                                if (!selectedDeptMeta.canDeleteDept) return;
+                                const ok = window.confirm(
+                                  `Delete “${selectedDept.title}” and all its sections? This cannot be undone.`,
+                                );
+                                if (ok) void onDeleteDepartment(selectedDept.id);
+                              }}
+                              className={[
+                                "inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition",
+                                !selectedDeptMeta.canDeleteDept
+                                  ? "cursor-not-allowed border border-slate-100 text-slate-300 opacity-60 dark:border-slate-800 dark:text-slate-600"
+                                  : "border border-red-200/80 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70",
+                              ].join(" ")}
+                            >
+                              <Trash2
+                                className="h-4 w-4"
+                                strokeWidth={2}
+                                aria-hidden
+                              />
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1017,6 +1057,8 @@ function DepartmentsWithNestedSections({
 }
 
 type DepartmentSectionSettingsProps = {
+  /** When set, snapshot and UI are limited to this department title (manager scope). */
+  configurationDepartmentScope?: string | null;
   initialSnapshot?: {
     departments: DirectoryItem[];
     sections: SectionItem[];
@@ -1028,7 +1070,11 @@ type DepartmentSectionSettingsProps = {
 
 export function DepartmentSectionSettings({
   initialSnapshot,
+  configurationDepartmentScope,
 }: DepartmentSectionSettingsProps = {}) {
+  const scopeKey = configurationDepartmentScope?.trim()
+    ? normalizeTitleKey(configurationDepartmentScope.trim())
+    : null;
   const [departments, setDepartments] = useState<DirectoryItem[]>(
     () => initialSnapshot?.departments ?? [],
   );
@@ -1132,6 +1178,10 @@ export function DepartmentSectionSettings({
   }, [loadDirectorySnapshot, scheduleEmployeeRefresh]);
 
   async function addDepartment(item: { title: string; description: string }) {
+    if (scopeKey) {
+      toast.error("Only an admin can add departments.");
+      return;
+    }
     const supabase = createClient();
     const { data, error } = await supabase
       .from("departments")
@@ -1162,6 +1212,11 @@ export function DepartmentSectionSettings({
     departmentId: string,
     item: { title: string; description: string },
   ) {
+    const dept = departments.find((d) => d.id === departmentId);
+    if (!departmentMatchesConfigScope(dept, scopeKey)) {
+      toast.error("You can only add sections under your assigned department.");
+      return;
+    }
     const supabase = createClient();
     const { data, error } = await supabase
       .from("sections")
@@ -1193,6 +1248,11 @@ export function DepartmentSectionSettings({
     id: string,
     item: { title: string; description: string },
   ) {
+    const row = departments.find((d) => d.id === id);
+    if (!departmentMatchesConfigScope(row, scopeKey)) {
+      toast.error("You can only manage your assigned department.");
+      return;
+    }
     const supabase = createClient();
     const { data: employeesUpdated, error } = await supabase.rpc(
       "apply_department_update_sync_employees",
@@ -1239,6 +1299,14 @@ export function DepartmentSectionSettings({
     id: string,
     item: { title: string; description: string },
   ) {
+    const secRow = sections.find((s) => s.id === id);
+    const dept = secRow
+      ? departments.find((d) => d.id === secRow.department_id)
+      : undefined;
+    if (!departmentMatchesConfigScope(dept, scopeKey)) {
+      toast.error("You can only manage sections in your assigned department.");
+      return;
+    }
     const supabase = createClient();
     const { data: employeesUpdated, error } = await supabase.rpc(
       "apply_section_update_sync_employees",
@@ -1286,6 +1354,10 @@ export function DepartmentSectionSettings({
   async function deleteDepartment(id: string) {
     const row = departments.find((d) => d.id === id);
     if (!row) return;
+    if (!departmentMatchesConfigScope(row, scopeKey)) {
+      toast.error("You can only manage your assigned department.");
+      return;
+    }
     const n = deptCounts[row.id] ?? 0;
     if (n > 0) {
       toast.error(
@@ -1317,6 +1389,11 @@ export function DepartmentSectionSettings({
   async function deleteSection(id: string) {
     const row = sections.find((s) => s.id === id);
     if (!row) return;
+    const dept = departments.find((d) => d.id === row.department_id);
+    if (!departmentMatchesConfigScope(dept, scopeKey)) {
+      toast.error("You can only manage sections in your assigned department.");
+      return;
+    }
     const n = secCounts[row.id] ?? 0;
     if (n > 0) {
       toast.error(
@@ -1385,6 +1462,7 @@ export function DepartmentSectionSettings({
         sections={sections}
         deptCounts={deptCounts}
         secCounts={secCounts}
+        lockDepartmentManagement={Boolean(scopeKey)}
         onAddDepartment={addDepartment}
         onUpdateDepartment={updateDepartment}
         onDeleteDepartment={deleteDepartment}

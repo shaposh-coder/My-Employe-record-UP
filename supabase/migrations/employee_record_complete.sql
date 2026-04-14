@@ -241,6 +241,10 @@ alter table public.user_access
 alter table public.user_access
   add column if not exists avatar_url text not null default '';
 
+alter table public.user_access
+  add column if not exists allowed_department text;
+
+comment on column public.user_access.allowed_department is 'When set, user only sees employees in this department (title match). Null/empty = all departments.';
 comment on column public.user_access.auth_user_id is 'auth.users.id when this row was created with login; null for legacy rows.';
 comment on column public.user_access.avatar_url is 'Public URL for optional profile photo (e.g. employee-docs bucket).';
 

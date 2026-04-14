@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +20,9 @@ const inputClass =
 const labelClass = "block text-sm font-medium text-slate-800 dark:text-slate-200";
 
 const MIN_PASSWORD_LEN = 8;
+
+/** Form `<select>` value → stored as `allowed_department: null` (Manager/Viewer full access). */
+const ASSIGNED_DEPARTMENT_ALL_VALUE = "__all_departments__";
 
 function isValidEmail(s: string): boolean {
   const t = s.trim();
@@ -61,6 +64,8 @@ export function UsersAccessSettings({
   const [formRole, setFormRole] = useState<UserAccessRole>("viewer");
   const [formNotes, setFormNotes] = useState("");
   const [formPassword, setFormPassword] = useState("");
+  const [formAllowedDepartment, setFormAllowedDepartment] = useState("");
+  const [departmentTitles, setDepartmentTitles] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +88,37 @@ export function UsersAccessSettings({
     void load();
   }, [directoryPrefetch, load]);
 
+  useEffect(() => {
+    if (!modalOpen) return;
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("departments")
+        .select("title")
+        .order("title");
+      if (cancelled) return;
+      if (error || !data) {
+        setDepartmentTitles([]);
+        return;
+      }
+      setDepartmentTitles(
+        data.map((r) => String((r as { title: string }).title)),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen]);
+
+  /** Edit: saved `allowed_department` no longer exists in Configuration — keep it selectable until admin fixes. */
+  const orphanAssignedDepartmentTitle = useMemo(() => {
+    if (!editingId || formRole === "admin") return null;
+    const cur = formAllowedDepartment;
+    if (!cur || cur === ASSIGNED_DEPARTMENT_ALL_VALUE) return null;
+    return departmentTitles.includes(cur) ? null : cur;
+  }, [editingId, formRole, formAllowedDepartment, departmentTitles]);
+
   function openAdd() {
     setEditingId(null);
     setFormName("");
@@ -90,6 +126,7 @@ export function UsersAccessSettings({
     setFormPassword("");
     setFormRole("viewer");
     setFormNotes("");
+    setFormAllowedDepartment(ASSIGNED_DEPARTMENT_ALL_VALUE);
     setModalOpen(true);
   }
 
@@ -100,6 +137,13 @@ export function UsersAccessSettings({
     setFormPassword("");
     setFormRole(row.access_role);
     setFormNotes(row.notes ?? "");
+    setFormAllowedDepartment(
+      row.access_role === "admin"
+        ? ""
+        : row.allowed_department?.trim()
+          ? row.allowed_department.trim()
+          : ASSIGNED_DEPARTMENT_ALL_VALUE,
+    );
     setModalOpen(true);
   }
 
@@ -123,6 +167,11 @@ export function UsersAccessSettings({
       return;
     }
 
+    if (formRole !== "admin" && !formAllowedDepartment.trim()) {
+      toast.error("Select an assigned department scope");
+      return;
+    }
+
     if (!editingId) {
       if (formPassword.length < MIN_PASSWORD_LEN) {
         toast.error(
@@ -134,6 +183,14 @@ export function UsersAccessSettings({
 
     setSaving(true);
 
+    const scopeDepartment =
+      formRole === "admin"
+        ? null
+        : formAllowedDepartment === ASSIGNED_DEPARTMENT_ALL_VALUE ||
+            !formAllowedDepartment.trim()
+          ? null
+          : formAllowedDepartment.trim();
+
     if (!editingId) {
       const res = await fetch("/api/user-access", {
         method: "POST",
@@ -143,6 +200,7 @@ export function UsersAccessSettings({
           password: formPassword,
           full_name: name,
           access_role: formRole,
+          allowed_department: scopeDepartment,
           notes: formNotes.trim(),
         }),
       });
@@ -168,6 +226,7 @@ export function UsersAccessSettings({
       .update({
         full_name: name,
         access_role: formRole,
+        allowed_department: scopeDepartment,
         notes: formNotes.trim(),
       })
       .eq("id", editingId);
@@ -258,7 +317,7 @@ export function UsersAccessSettings({
           </div>
         ) : (
           <div className="w-full min-w-0 overflow-x-auto">
-            <table className="w-full min-w-[700px] border-collapse text-left text-sm">
+            <table className="w-full min-w-[820px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
                   <th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -273,6 +332,9 @@ export function UsersAccessSettings({
                   <th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Access
                   </th>
+                  <th className="whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Dept scope
+                  </th>
                   <th className="min-w-[8rem] px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Notes
                   </th>
@@ -285,7 +347,7 @@ export function UsersAccessSettings({
                 {rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-6 py-14 text-center text-slate-500 dark:text-slate-400"
                     >
                       No users yet. Use{" "}
@@ -323,6 +385,13 @@ export function UsersAccessSettings({
                         >
                           {USER_ACCESS_ROLE_LABELS[row.access_role]}
                         </span>
+                      </td>
+                      <td className="max-w-[10rem] truncate px-4 py-3 text-slate-600 dark:text-slate-400">
+                        {row.access_role === "admin"
+                          ? "—"
+                          : row.allowed_department?.trim()
+                            ? row.allowed_department
+                            : "All departments"}
                       </td>
                       <td className="max-w-[14rem] truncate px-4 py-3 text-slate-600 dark:text-slate-400">
                         {row.notes?.trim() ? row.notes : "—"}
@@ -376,10 +445,20 @@ export function UsersAccessSettings({
             >
               {editingId ? "Edit user" : "Add user"}
             </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              <span className="font-medium text-red-600 dark:text-red-400">
+                *
+              </span>{" "}
+              Required fields. Notes are optional.
+              {editingId ? " Email cannot be changed." : null}
+            </p>
             <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-4">
               <div>
                 <label htmlFor="ua-name" className={labelClass}>
                   Full name
+                  <span className="ml-0.5 text-red-600 dark:text-red-400">
+                    *
+                  </span>
                 </label>
                 <input
                   id="ua-name"
@@ -394,6 +473,9 @@ export function UsersAccessSettings({
               <div>
                 <label htmlFor="ua-email" className={labelClass}>
                   Email
+                  <span className="ml-0.5 text-red-600 dark:text-red-400">
+                    *
+                  </span>
                 </label>
                 <input
                   id="ua-email"
@@ -439,14 +521,28 @@ export function UsersAccessSettings({
               <div>
                 <label htmlFor="ua-role" className={labelClass}>
                   Access level
+                  <span className="ml-0.5 text-red-600 dark:text-red-400">
+                    *
+                  </span>
                 </label>
                 <select
                   id="ua-role"
                   className={inputClass}
                   value={formRole}
-                  onChange={(e) =>
-                    setFormRole(e.target.value as UserAccessRole)
-                  }
+                  required
+                  onChange={(e) => {
+                    const r = e.target.value as UserAccessRole;
+                    setFormRole(r);
+                    if (r === "admin") {
+                      setFormAllowedDepartment("");
+                    } else {
+                      setFormAllowedDepartment((prev) =>
+                        prev.trim() === ""
+                          ? ASSIGNED_DEPARTMENT_ALL_VALUE
+                          : prev,
+                      );
+                    }
+                  }}
                 >
                   {USER_ACCESS_ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -456,6 +552,55 @@ export function UsersAccessSettings({
                   ))}
                 </select>
               </div>
+              {formRole === "admin" ? (
+                <p className="rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    Admin
+                  </span>{" "}
+                  accounts are not limited to one department — they always see
+                  all departments. Saving clears any old department assignment.
+                </p>
+              ) : (
+                <div>
+                  <label htmlFor="ua-dept-scope" className={labelClass}>
+                    Assigned department{" "}
+                    <span className="ml-0.5 text-red-600 dark:text-red-400">
+                      *
+                    </span>
+                  </label>
+                  <select
+                    key={editingId ? `dept-${editingId}` : "dept-new"}
+                    id="ua-dept-scope"
+                    className={inputClass}
+                    value={formAllowedDepartment}
+                    onChange={(e) => setFormAllowedDepartment(e.target.value)}
+                    required
+                  >
+                    <option value={ASSIGNED_DEPARTMENT_ALL_VALUE}>
+                      All departments
+                    </option>
+                    {orphanAssignedDepartmentTitle ? (
+                      <option value={orphanAssignedDepartmentTitle}>
+                        {orphanAssignedDepartmentTitle} (current — not in
+                        Configuration)
+                      </option>
+                    ) : null}
+                    {departmentTitles.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-medium text-slate-600 dark:text-slate-300">
+                      All departments
+                    </span>{" "}
+                    gives full directory and configuration access (for this
+                    role). Pick one department to limit the user to that
+                    department only.
+                  </p>
+                </div>
+              )}
               <div>
                 <label htmlFor="ua-notes" className={labelClass}>
                   Notes{" "}

@@ -12,6 +12,32 @@ function mapTitles(
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
+async function loadCities(
+  supabase: SupabaseClient,
+): Promise<{ cities: string[]; error: string | null }> {
+  const cityRes = await supabase.rpc("get_employee_distinct_cities");
+  if (cityRes.error) {
+    return { cities: [], error: null };
+  }
+  const raw = cityRes.data as unknown;
+  if (!Array.isArray(raw)) {
+    return { cities: [], error: null };
+  }
+  const cities = raw
+    .map((row) => {
+      if (row && typeof row === "object" && "city" in row) {
+        return String((row as { city: string }).city ?? "").trim();
+      }
+      if (typeof row === "string") return row.trim();
+      return "";
+    })
+    .filter(Boolean);
+  return {
+    cities: [...new Set(cities)].sort((a, b) => a.localeCompare(b)),
+    error: null,
+  };
+}
+
 /**
  * Directory filter dropdowns: departments and sections from configuration tables
  * (not a full scan of `employees`). Cities from DB RPC `get_employee_distinct_cities`
@@ -19,6 +45,7 @@ function mapTitles(
  */
 export async function fetchEmployeeFilterOptions(
   supabase: SupabaseClient,
+  options?: { departmentScope?: string | null },
 ): Promise<{
   departments: string[];
   sections: string[];
@@ -26,10 +53,50 @@ export async function fetchEmployeeFilterOptions(
   error: string | null;
 }> {
   try {
-    const [dRes, sRes, cityRes] = await Promise.all([
+    const scope = options?.departmentScope?.trim();
+
+    if (scope) {
+      const dr = await supabase
+        .from("departments")
+        .select("id, title")
+        .eq("title", scope)
+        .limit(1);
+      if (dr.error) {
+        return {
+          departments: [],
+          sections: [],
+          cities: [],
+          error: dr.error.message,
+        };
+      }
+      let departments: string[] = [];
+      let sections: string[] = [];
+      if (dr.data?.length) {
+        const row = dr.data[0] as { id: string; title: string };
+        if (row.title?.trim()) departments = [row.title.trim()];
+        const sr = await supabase
+          .from("sections")
+          .select("title")
+          .eq("department_id", row.id)
+          .order("title");
+        if (sr.error) {
+          return {
+            departments: [],
+            sections: [],
+            cities: [],
+            error: sr.error.message,
+          };
+        }
+        sections = mapTitles(sr.data as { title: string | null }[]);
+      }
+      const { cities } = await loadCities(supabase);
+      return { departments, sections, cities, error: null };
+    }
+
+    const [dRes, sRes, cityPack] = await Promise.all([
       supabase.from("departments").select("title").order("title"),
       supabase.from("sections").select("title").order("title"),
-      supabase.rpc("get_employee_distinct_cities"),
+      loadCities(supabase),
     ]);
 
     if (dRes.error) {
@@ -52,27 +119,12 @@ export async function fetchEmployeeFilterOptions(
     const departments = mapTitles(dRes.data as { title: string | null }[]);
     const sections = mapTitles(sRes.data as { title: string | null }[]);
 
-    let cities: string[] = [];
-    if (cityRes.error) {
-      // RPC not deployed yet — optional legacy path (avoid loading all rows in production).
-      cities = [];
-    } else {
-      const raw = cityRes.data as unknown;
-      if (Array.isArray(raw)) {
-        cities = raw
-          .map((row) => {
-            if (row && typeof row === "object" && "city" in row) {
-              return String((row as { city: string }).city ?? "").trim();
-            }
-            if (typeof row === "string") return row.trim();
-            return "";
-          })
-          .filter(Boolean);
-        cities = [...new Set(cities)].sort((a, b) => a.localeCompare(b));
-      }
-    }
-
-    return { departments, sections, cities, error: null };
+    return {
+      departments,
+      sections,
+      cities: cityPack.cities,
+      error: null,
+    };
   } catch (e) {
     return {
       departments: [],

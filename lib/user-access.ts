@@ -9,6 +9,8 @@ export type UserAccessRow = {
   email: string;
   full_name: string;
   access_role: UserAccessRole;
+  /** When set, user is scoped to this department title (directory + dashboard). */
+  allowed_department: string | null;
   notes: string;
   /** Public URL for optional profile photo. */
   avatar_url?: string;
@@ -40,7 +42,7 @@ export async function fetchUserAccessRows(
   const { data, error } = await supabase
     .from("user_access")
     .select(
-      "id, email, full_name, access_role, notes, avatar_url, auth_user_id, created_at, updated_at",
+      "id, email, full_name, access_role, allowed_department, notes, avatar_url, auth_user_id, created_at, updated_at",
     )
     .order("created_at", { ascending: true });
 

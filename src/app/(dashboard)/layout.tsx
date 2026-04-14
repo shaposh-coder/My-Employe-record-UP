@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   const email = normalizeUserAccessEmail(user.email);
   const { data: access } = await supabase
     .from("user_access")
-    .select("id, access_role, full_name, email, avatar_url")
+    .select("id, access_role, full_name, email, avatar_url, allowed_department")
     .eq("email", email)
     .maybeSingle();
 
@@ -38,6 +38,7 @@ export default async function DashboardLayout({
 
   const accessRole = access.access_role as UserAccessRole;
   const avatarRaw = access.avatar_url as string | null | undefined;
+  const allowedRaw = access.allowed_department as string | null | undefined;
   const profile = {
     role: accessRole,
     email: access.email as string,
@@ -49,6 +50,12 @@ export default async function DashboardLayout({
         ? avatarRaw.trim()
         : null,
     userAccessId: access.id as string,
+    allowedDepartment:
+      accessRole === "admin"
+        ? null
+        : typeof allowedRaw === "string" && allowedRaw.trim() !== ""
+          ? allowedRaw.trim()
+          : null,
   };
 
   return (

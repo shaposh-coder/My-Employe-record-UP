@@ -97,6 +97,14 @@ export async function POST(req: Request) {
   if (!isRole(access_role)) {
     return NextResponse.json({ error: "Invalid access level" }, { status: 400 });
   }
+
+  const rawAllowedDept =
+    body.allowed_department === null || body.allowed_department === undefined
+      ? ""
+      : String(body.allowed_department).trim();
+  const allowed_department: string | null =
+    access_role === "admin" ? null : rawAllowedDept || null;
+
   if (password.length < MIN_PASSWORD_LEN) {
     return NextResponse.json(
       {
@@ -104,6 +112,20 @@ export async function POST(req: Request) {
       },
       { status: 400 },
     );
+  }
+
+  if (allowed_department) {
+    const { data: deptRow, error: deptErr } = await admin
+      .from("departments")
+      .select("title")
+      .eq("title", allowed_department)
+      .maybeSingle();
+    if (deptErr || !deptRow) {
+      return NextResponse.json(
+        { error: "Assigned department must match a department in Configuration" },
+        { status: 400 },
+      );
+    }
   }
 
   const { data: authData, error: authErr } = await admin.auth.admin.createUser({
@@ -127,6 +149,7 @@ export async function POST(req: Request) {
     email,
     full_name,
     access_role,
+    allowed_department,
     notes,
     auth_user_id: userId,
   });

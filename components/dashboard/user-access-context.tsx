@@ -9,6 +9,8 @@ export type UserAccessContextValue = {
   fullName: string;
   avatarUrl: string | null;
   userAccessId: string;
+  /** Department title scope — null = no restriction. */
+  allowedDepartment: string | null;
 };
 
 const UserAccessContext = createContext<UserAccessContextValue | null>(null);

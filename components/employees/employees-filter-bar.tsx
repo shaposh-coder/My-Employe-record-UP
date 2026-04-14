@@ -37,6 +37,8 @@ function EmployeesFilterBarInner({
   activeFilterCount,
   /** Disables filter popover + dropdowns while data loads. Search stays focused & editable. */
   filterControlsDisabled,
+  /** When true, department filter is fixed (directory scoped to one department). */
+  departmentLocked,
   /** Narrow bar for header row — sits left of action buttons. */
   variant = "default",
 }: {
@@ -63,6 +65,7 @@ function EmployeesFilterBarInner({
   /** Number of active filters (Name / CNIC / Department / Section / City / Status). */
   activeFilterCount: number;
   filterControlsDisabled?: boolean;
+  departmentLocked?: boolean;
   variant?: "default" | "toolbar";
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -179,7 +182,7 @@ function EmployeesFilterBarInner({
                 onChange={onDepartmentChange}
                 options={departmentOptions}
                 emptyOptionLabel="All departments"
-                disabled={filterControlsDisabled}
+                disabled={filterControlsDisabled || departmentLocked}
               />
               <SearchableSelect
                 label="Section"

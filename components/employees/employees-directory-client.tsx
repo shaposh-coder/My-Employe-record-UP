@@ -62,12 +62,12 @@ export function EmployeesDirectoryClient({
 }: EmployeesDirectoryClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { role, allowedDepartment } = useUserAccess();
+  const scopedDept = allowedDepartment?.trim() ?? "";
 
   const departmentParam = searchParams.get("department") ?? "";
   const sectionParam = searchParams.get("section") ?? "";
   const cityParam = searchParams.get("city") ?? "";
-
-  const { role } = useUserAccess();
   const readOnly = role === "viewer";
   const { setEndSlot } = useTopbarEndSlot();
   const [page, setPage] = useState(1);
@@ -92,7 +92,7 @@ export function EmployeesDirectoryClient({
   const [cnicFilterInput, setCnicFilterInput] = useState("");
   const [debouncedCnicFilter, setDebouncedCnicFilter] = useState("");
   const [department, setDepartment] = useState(
-    () => searchParams.get("department") ?? "",
+    () => scopedDept || (searchParams.get("department") ?? ""),
   );
   const [section, setSection] = useState(
     () => searchParams.get("section") ?? "",
@@ -133,10 +133,16 @@ export function EmployeesDirectoryClient({
   }, [cnicFilterInput]);
 
   useEffect(() => {
+    if (scopedDept) {
+      setDepartment(scopedDept);
+      setSection(sectionParam);
+      setCity(cityParam);
+      return;
+    }
     setDepartment(departmentParam);
     setSection(sectionParam);
     setCity(cityParam);
-  }, [departmentParam, sectionParam, cityParam]);
+  }, [departmentParam, sectionParam, cityParam, scopedDept]);
 
   useEffect(() => {
     setStatus(parseEmployeesStatusQueryParam(searchParams.get("status")));
@@ -367,18 +373,22 @@ export function EmployeesDirectoryClient({
     setDebouncedNameFilter("");
     setCnicFilterInput("");
     setDebouncedCnicFilter("");
-    setDepartment("");
+    setDepartment(scopedDept);
     setSection("");
     setCity("");
     setStatus("");
     setPage(1);
     router.replace("/employees", { scroll: false });
-  }, [router]);
+  }, [router, scopedDept]);
 
-  const handleDepartmentChange = useCallback((v: string) => {
-    setDepartment(v);
-    setPage(1);
-  }, []);
+  const handleDepartmentChange = useCallback(
+    (v: string) => {
+      if (scopedDept) return;
+      setDepartment(v);
+      setPage(1);
+    },
+    [scopedDept],
+  );
 
   const handleSectionChange = useCallback((v: string) => {
     setSection(v);
@@ -441,6 +451,7 @@ export function EmployeesDirectoryClient({
           hasActiveFilters={hasActiveFilters}
           activeFilterCount={activeFilterCount}
           filterControlsDisabled={listLoading}
+          departmentLocked={Boolean(scopedDept)}
         />
         <EmployeesImportExportToolbar
           exportFilters={exportFilters}
@@ -489,6 +500,7 @@ export function EmployeesDirectoryClient({
       handleClearFilters,
       setVisibility,
       readOnly,
+      scopedDept,
     ],
   );
 

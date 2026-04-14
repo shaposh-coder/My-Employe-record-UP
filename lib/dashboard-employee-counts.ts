@@ -11,17 +11,18 @@ export type DashboardEmployeeCounts = {
 /** Counts respect RLS (same as directory). */
 export async function fetchDashboardEmployeeCounts(
   supabase: SupabaseClient,
+  options?: { department?: string | null },
 ): Promise<DashboardEmployeeCounts> {
+  const dept = options?.department?.trim();
+  const base = () => supabase.from("employees").select("*", { count: "exact", head: true });
   const [totalRes, activeRes, unActiveRes] = await Promise.all([
-    supabase.from("employees").select("*", { count: "exact", head: true }),
-    supabase
-      .from("employees")
-      .select("*", { count: "exact", head: true })
-      .eq("status", EMPLOYEE_STATUS.Active),
-    supabase
-      .from("employees")
-      .select("*", { count: "exact", head: true })
-      .eq("status", EMPLOYEE_STATUS.UnActive),
+    dept ? base().eq("department", dept) : base(),
+    dept
+      ? base().eq("department", dept).eq("status", EMPLOYEE_STATUS.Active)
+      : base().eq("status", EMPLOYEE_STATUS.Active),
+    dept
+      ? base().eq("department", dept).eq("status", EMPLOYEE_STATUS.UnActive)
+      : base().eq("status", EMPLOYEE_STATUS.UnActive),
   ]);
 
   const err =

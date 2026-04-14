@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllowedDepartmentForSession } from "@/lib/fetch-allowed-department-for-session";
 import { fetchEmployeeFullById } from "@/lib/fetch-employee-by-id";
 import { fetchEmployeeFilterOptions } from "@/lib/fetch-employee-filter-options";
 import {
@@ -11,12 +12,19 @@ import {
 
 export async function loadEmployeesDirectory(options: FetchEmployeesOptions) {
   const supabase = await createClient();
-  return fetchEmployees(supabase, options);
+  const scope = await fetchAllowedDepartmentForSession(supabase);
+  return fetchEmployees(supabase, {
+    ...options,
+    accessScopeDepartment: scope ?? undefined,
+  });
 }
 
 export async function loadDirectoryFilterOptions() {
   const supabase = await createClient();
-  return fetchEmployeeFilterOptions(supabase);
+  const scope = await fetchAllowedDepartmentForSession(supabase);
+  return fetchEmployeeFilterOptions(supabase, {
+    departmentScope: scope,
+  });
 }
 
 export async function loadEmployeeFullForModal(id: string) {
@@ -28,7 +36,11 @@ export async function loadEmployeesForCsvExport(
   filters: Omit<FetchEmployeesOptions, "page" | "pageSize">,
 ) {
   const supabase = await createClient();
-  return fetchAllEmployeesForExport(supabase, filters);
+  const scope = await fetchAllowedDepartmentForSession(supabase);
+  return fetchAllEmployeesForExport(supabase, {
+    ...filters,
+    accessScopeDepartment: scope ?? undefined,
+  });
 }
 
 export async function deleteEmployeeRow(id: string) {

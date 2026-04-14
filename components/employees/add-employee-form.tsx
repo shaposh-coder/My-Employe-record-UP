@@ -154,6 +154,8 @@ type AddEmployeeFormProps = {
   initialDepartments?: FormDepartmentOptionRow[];
   initialSections?: FormSectionOptionRow[];
   initialConfigError?: string | null;
+  /** When set, department is fixed to this title and only that dept's sections are listed. */
+  lockedDepartmentTitle?: string | null;
 };
 
 export function AddEmployeeForm({
@@ -162,6 +164,7 @@ export function AddEmployeeForm({
   initialDepartments,
   initialSections,
   initialConfigError,
+  lockedDepartmentTitle,
 }: AddEmployeeFormProps) {
   const router = useRouter();
   const [loadingEmployee, setLoadingEmployee] = useState(() =>
@@ -215,6 +218,19 @@ export function AddEmployeeForm({
   const cnicNo = watch("cnic_no");
   const departmentValue = watch("department");
   const sectionValue = watch("section");
+
+  const lockDeptTitle = lockedDepartmentTitle?.trim() ?? "";
+  const departmentFieldLocked = Boolean(lockDeptTitle);
+
+  useEffect(() => {
+    if (!lockDeptTitle || configLoading) return;
+    if (departments.some((d) => d.title === lockDeptTitle)) {
+      setValue("department", lockDeptTitle, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [lockDeptTitle, configLoading, departments, setValue]);
 
   const sectionOptionsForDepartment = useMemo(() => {
     const dept = departments.find((d) => d.title === departmentValue);
@@ -292,7 +308,11 @@ export function AddEmployeeForm({
           }
           onBlur={() => void trigger("department")}
           loading={configLoading}
-          disabled={configLoading || departments.length === 0}
+          disabled={
+            configLoading ||
+            departments.length === 0 ||
+            departmentFieldLocked
+          }
           inputClassName={inputClass}
           emptyMessage="No departments — add in Configuration"
           searchPlaceholder="Search or select department"
@@ -450,8 +470,16 @@ export function AddEmployeeForm({
         setDepartments([]);
         setSections([]);
       } else {
-        setDepartments((dRes.data as ConfigOptionRow[]) ?? []);
-        setSections((sRes.data as SectionOptionRow[]) ?? []);
+        let dList = (dRes.data as ConfigOptionRow[]) ?? [];
+        let sList = (sRes.data as SectionOptionRow[]) ?? [];
+        const lock = lockedDepartmentTitle?.trim();
+        if (lock) {
+          dList = dList.filter((d) => d.title === lock);
+          const ids = new Set(dList.map((d) => d.id));
+          sList = sList.filter((s) => ids.has(s.department_id));
+        }
+        setDepartments(dList);
+        setSections(sList);
       }
       setConfigLoading(false);
     }
@@ -460,7 +488,7 @@ export function AddEmployeeForm({
     return () => {
       cancelled = true;
     };
-  }, [serverOptionsOk]);
+  }, [serverOptionsOk, lockedDepartmentTitle]);
 
   function docFolder(field: DocFieldKey) {
     return `drafts/${draftId}/${DOC_SLUGS[field]}`;

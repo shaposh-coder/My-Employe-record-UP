@@ -36,6 +36,11 @@ export type FetchEmployeesOptions = {
   city?: string;
   /** When set, only rows with this `employees.status` (Active / Un-Active). */
   status?: EmployeeStoredStatus;
+  /**
+   * Session department scope (from `user_access.allowed_department`).
+   * When set, overrides `department` filter for `.eq("department", …)`.
+   */
+  accessScopeDepartment?: string | null;
 };
 
 /** Strip characters that break PostgREST `or()` filter strings. */
@@ -117,8 +122,10 @@ export async function fetchEmployees(
       }
     }
 
-    const dept = options?.department?.trim();
-    if (dept) query = query.eq("department", dept);
+    const scopeDept = options?.accessScopeDepartment?.trim();
+    const userDept = options?.department?.trim();
+    const deptEq = scopeDept || userDept;
+    if (deptEq) query = query.eq("department", deptEq);
 
     const sec = options?.section?.trim();
     if (sec) query = query.eq("section", sec);

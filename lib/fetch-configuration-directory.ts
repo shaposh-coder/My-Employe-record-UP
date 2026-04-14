@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatTitleForStorage } from "@/lib/configuration/format-directory-title";
+import { normalizeTitleKey } from "@/lib/normalize-title-key";
 
 export type ConfigurationDirectoryItem = {
   id: string;
@@ -59,12 +60,56 @@ function sortByTitle<T extends { title: string }>(a: T, b: T) {
   return a.title.localeCompare(b.title);
 }
 
+/** When set (e.g. manager `user_access.allowed_department`), only that department and its sections appear. */
+function narrowSnapshotToDepartmentTitle(
+  departmentTitleScope: string | null | undefined,
+  departments: ConfigurationDirectoryItem[],
+  sections: ConfigurationSectionItem[],
+  deptCounts: Record<string, number>,
+  secCounts: Record<string, number>,
+): {
+  departments: ConfigurationDirectoryItem[];
+  sections: ConfigurationSectionItem[];
+  deptCounts: Record<string, number>;
+  secCounts: Record<string, number>;
+} {
+  const raw = departmentTitleScope?.trim();
+  if (!raw) {
+    return { departments, sections, deptCounts, secCounts };
+  }
+  const sk = normalizeTitleKey(raw);
+  const departmentsN = departments.filter(
+    (d) => normalizeTitleKey(d.title) === sk,
+  );
+  const ids = new Set(departmentsN.map((d) => d.id));
+  const sectionsN = sections.filter((s) => ids.has(s.department_id));
+  const deptCountsN: Record<string, number> = {};
+  for (const d of departmentsN) {
+    deptCountsN[d.id] = deptCounts[d.id] ?? 0;
+  }
+  const secCountsN: Record<string, number> = {};
+  for (const s of sectionsN) {
+    secCountsN[s.id] = secCounts[s.id] ?? 0;
+  }
+  return {
+    departments: departmentsN,
+    sections: sectionsN,
+    deptCounts: deptCountsN,
+    secCounts: secCountsN,
+  };
+}
+
+export type FetchConfigurationDirectoryOptions = {
+  departmentTitleScope?: string | null;
+};
+
 /**
  * Departments, sections, and per-row employee counts for Configuration UI.
  * Uses RPC counts when available; otherwise a bounded fallback on `employees`.
  */
 export async function fetchConfigurationDirectorySnapshot(
   supabase: SupabaseClient,
+  options?: FetchConfigurationDirectoryOptions,
 ): Promise<{
   departments: ConfigurationDirectoryItem[];
   sections: ConfigurationSectionItem[];
@@ -72,6 +117,7 @@ export async function fetchConfigurationDirectorySnapshot(
   secCounts: Record<string, number>;
   error: string | null;
 }> {
+  const scope = options?.departmentTitleScope;
   const [dRes, sRes] = await Promise.all([
     supabase.from("departments").select("*").order("title"),
     supabase.from("sections").select("*").order("title"),
@@ -117,11 +163,15 @@ export async function fetchConfigurationDirectorySnapshot(
   ]);
 
   if (!dcRes.error && dcRes.data != null && !scRes.error && scRes.data != null) {
+    const narrowed = narrowSnapshotToDepartmentTitle(
+      scope,
+      deptRows,
+      secRows,
+      mapCount(dcRes.data as DeptCountRow[], "dept_id"),
+      mapCount(scRes.data as SecCountRow[], "section_id"),
+    );
     return {
-      departments: deptRows,
-      sections: secRows,
-      deptCounts: mapCount(dcRes.data as DeptCountRow[], "dept_id"),
-      secCounts: mapCount(scRes.data as SecCountRow[], "section_id"),
+      ...narrowed,
       error: null,
     };
   }
@@ -130,11 +180,15 @@ export async function fetchConfigurationDirectorySnapshot(
     .from("employees")
     .select("department, section");
   if (empErr) {
+    const narrowed = narrowSnapshotToDepartmentTitle(
+      scope,
+      deptRows,
+      secRows,
+      {},
+      {},
+    );
     return {
-      departments: deptRows,
-      sections: secRows,
-      deptCounts: {},
-      secCounts: {},
+      ...narrowed,
       error: null,
     };
   }
@@ -143,11 +197,15 @@ export async function fetchConfigurationDirectorySnapshot(
     section: string | null;
   }[];
   const { dept, sec } = buildFallbackCounts(deptRows, secRows, list);
+  const narrowed = narrowSnapshotToDepartmentTitle(
+    scope,
+    deptRows,
+    secRows,
+    dept,
+    sec,
+  );
   return {
-    departments: deptRows,
-    sections: secRows,
-    deptCounts: dept,
-    secCounts: sec,
+    ...narrowed,
     error: null,
   };
 }
