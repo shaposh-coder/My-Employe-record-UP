@@ -42,7 +42,7 @@ export default async function EmployeesPage({ searchParams }: PageProps) {
       fallback={
         <div className="flex min-h-0 w-full flex-1 flex-col">
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]">
-            <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-t-2xl">
+            <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl">
               <EmployeesTableSkeleton
                 visibility={defaultColumnVisibility()}
                 rowCount={DEFAULT_EMPLOYEES_PAGE_SIZE}

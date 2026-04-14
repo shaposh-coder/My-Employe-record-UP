@@ -4,6 +4,10 @@ import {
   ensureFixedColumnVisibility,
   type EmployeeColumnId,
 } from "@/lib/employee-table-columns";
+import {
+  employeesTableStickyActionClasses,
+  employeesTableStickyPairClasses,
+} from "@/lib/employee-table-sticky-columns";
 import { EmployeeSocialLinksCell } from "./employee-social-links-cell";
 import { EmployeeRowActionsMenu } from "./employee-row-actions-menu";
 import type { EmployeeListRow } from "./employee-list-row";
@@ -85,7 +89,7 @@ type ColDef = {
 function columnMinClass(colId: EmployeeColumnId): string {
   switch (colId) {
     case "image":
-      return "min-w-[3.5rem]";
+      return "min-w-[4.5rem]";
     case "social":
       return "min-w-[4.5rem]";
     case "action":
@@ -306,9 +310,10 @@ export function EmployeesTable({
       : defs.filter((d) => d.id === "image" || d.id === "name");
   const firstFamilyIdx = visible.findIndex((d) => d.familyGroup);
   const colCount = Math.max(visible.length, 1);
+  const visibleIds = visible.map((c) => c.id);
 
   const thBase =
-    "whitespace-nowrap px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400";
+    "sticky top-0 z-10 whitespace-nowrap bg-slate-50/90 px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-400";
   const tdBase =
     "whitespace-nowrap px-4 py-3 align-middle text-slate-800 dark:text-slate-200";
 
@@ -316,12 +321,20 @@ export function EmployeesTable({
     ? "bg-white dark:bg-slate-900"
     : "rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]";
 
+  const rootClass = embedInCard
+    ? ["flex h-full min-h-0 w-full min-w-0 flex-col", shellClass].join(" ")
+    : ["min-w-0 w-full", shellClass].join(" ");
+
+  const scrollClass = embedInCard
+    ? "min-h-0 min-w-0 flex-1 overflow-auto"
+    : "w-full min-w-0 overflow-auto";
+
   return (
-    <div className={["min-w-0 w-full", shellClass].join(" ")}>
-      <div className="w-full min-w-0 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
+    <div className={rootClass}>
+      <div className={scrollClass}>
+        <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
+            <tr className="border-b border-slate-200 dark:border-slate-800">
               {visible.map((col, i) => (
                 <th
                   key={col.id}
@@ -329,6 +342,18 @@ export function EmployeesTable({
                   className={[
                     thBase,
                     columnMinClass(col.id),
+                    employeesTableStickyPairClasses(
+                      col.id,
+                      i,
+                      visibleIds,
+                      "th",
+                    ),
+                    employeesTableStickyActionClasses(
+                      col.id,
+                      i,
+                      visibleIds,
+                      "th",
+                    ),
                     col.thClass ?? "",
                     i === firstFamilyIdx && firstFamilyIdx >= 0
                       ? "border-l border-slate-200 dark:border-slate-700"
@@ -382,6 +407,18 @@ export function EmployeesTable({
                     className={[
                       tdBase,
                       columnMinClass(col.id),
+                      employeesTableStickyPairClasses(
+                        col.id,
+                        i,
+                        visibleIds,
+                        "td",
+                      ),
+                      employeesTableStickyActionClasses(
+                        col.id,
+                        i,
+                        visibleIds,
+                        "td",
+                      ),
                       col.tdClass ?? "",
                       i === firstFamilyIdx && firstFamilyIdx >= 0
                         ? "border-l border-slate-100 dark:border-slate-800"

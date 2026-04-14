@@ -5,11 +5,15 @@ import {
   ensureFixedColumnVisibility,
   type EmployeeColumnId,
 } from "@/lib/employee-table-columns";
+import {
+  employeesTableStickyActionClasses,
+  employeesTableStickyPairClasses,
+} from "@/lib/employee-table-sticky-columns";
 
 function columnMinClass(colId: EmployeeColumnId): string {
   switch (colId) {
     case "image":
-      return "min-w-[3.5rem]";
+      return "min-w-[4.5rem]";
     case "social":
       return "min-w-[4.5rem]";
     case "action":
@@ -51,24 +55,40 @@ export function EmployeesTableSkeleton({
   const rows = Math.max(1, Math.min(rowCount, 100));
 
   const thBase =
-    "whitespace-nowrap px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 dark:text-slate-400";
+    "sticky top-0 z-10 whitespace-nowrap bg-slate-50/90 px-4 py-3 align-middle text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-400";
   const tdBase = "whitespace-nowrap px-4 py-3 align-middle";
 
   const shellClass = embedInCard
     ? "bg-white dark:bg-slate-900"
     : "rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]";
 
+  const rootClass = embedInCard
+    ? ["flex h-full min-h-0 w-full min-w-0 flex-col", shellClass].join(" ")
+    : ["min-w-0 w-full", shellClass].join(" ");
+  const scrollClass = embedInCard
+    ? "min-h-0 min-w-0 flex-1 overflow-auto"
+    : "w-full min-w-0 overflow-auto";
+
   return (
-    <div className={["min-w-0 w-full", shellClass].join(" ")} aria-busy="true" aria-label="Loading employees">
-      <div className="w-full min-w-0 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
+    <div
+      className={rootClass}
+      aria-busy="true"
+      aria-label="Loading employees"
+    >
+      <div className={scrollClass}>
+        <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/90 dark:border-slate-800 dark:bg-slate-950/80">
-              {cols.map((colId) => (
+            <tr className="border-b border-slate-200 dark:border-slate-800">
+              {cols.map((colId, i) => (
                 <th
                   key={colId}
                   scope="col"
-                  className={[thBase, columnMinClass(colId)].join(" ")}
+                  className={[
+                    thBase,
+                    columnMinClass(colId),
+                    employeesTableStickyPairClasses(colId, i, cols, "th"),
+                    employeesTableStickyActionClasses(colId, i, cols, "th"),
+                  ].join(" ")}
                 >
                   <Pulse className="mx-auto h-3 w-16 max-w-full" />
                 </th>
@@ -81,10 +101,15 @@ export function EmployeesTableSkeleton({
                 key={ri}
                 className="border-b border-slate-100 last:border-0 dark:border-slate-800/80"
               >
-                {cols.map((colId) => (
+                {cols.map((colId, i) => (
                   <td
                     key={colId}
-                    className={[tdBase, columnMinClass(colId)].join(" ")}
+                    className={[
+                      tdBase,
+                      columnMinClass(colId),
+                      employeesTableStickyPairClasses(colId, i, cols, "td"),
+                      employeesTableStickyActionClasses(colId, i, cols, "td"),
+                    ].join(" ")}
                   >
                     {colId === "image" ? (
                       <Pulse className="h-10 w-10 shrink-0 rounded-full" />
