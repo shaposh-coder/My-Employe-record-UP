@@ -26,6 +26,7 @@ import {
   loadEmployeeTimelineEntries,
   type EmployeeTimelineEntryRow,
 } from "@/lib/actions/employee-timeline-data";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmployeeAddTimelineModal } from "./employee-add-timeline-modal";
 import type { EmployeeListRow } from "./employee-list-row";
 import { SocialPlatformIcon } from "./social-platform-icons";
@@ -504,8 +505,12 @@ export function EmployeeDetailModal({
     useState<EmployeeTimelineEntryRow | null>(null);
   const [timelineEditEntry, setTimelineEditEntry] =
     useState<EmployeeTimelineEntryRow | null>(null);
+  const [pendingTimelineDelete, setPendingTimelineDelete] =
+    useState<EmployeeTimelineEntryRow | null>(null);
   const timelineEditOpenRef = useRef(false);
   timelineEditOpenRef.current = timelineEditEntry !== null;
+  const timelineDeleteConfirmRef = useRef(false);
+  timelineDeleteConfirmRef.current = pendingTimelineDelete !== null;
   const timelineDetailOpenRef = useRef(false);
   timelineDetailOpenRef.current = timelineDetailEntry !== null;
   /** Set in effect before fetch — if full load fails, keep table preview visible. */
@@ -539,12 +544,14 @@ export function EmployeeDetailModal({
       setTimelineError(null);
       setTimelineDetailEntry(null);
       setTimelineEditEntry(null);
+      setPendingTimelineDelete(null);
       return;
     }
     setTimelineRows(null);
     setTimelineError(null);
     setTimelineDetailEntry(null);
     setTimelineEditEntry(null);
+    setPendingTimelineDelete(null);
     setActiveTab("personal");
     setError(null);
     const withPreview = initialListRow?.id === employeeId;
@@ -602,26 +609,31 @@ export function EmployeeDetailModal({
       window.removeEventListener("employee-timeline-saved", onTimelineSaved);
   }, [employeeId]);
 
-  const handleDeleteTimelineEntry = useCallback(
-    async (entry: EmployeeTimelineEntryRow) => {
-      if (!employeeId) return;
-      if (!window.confirm("Delete this timeline entry?")) return;
-      const { error } = await deleteEmployeeTimelineEntry(
-        employeeId,
-        entry.id,
-      );
-      if (error) {
-        toast.error(error);
-        return;
-      }
-      toast.success("Timeline entry deleted");
-      setTimelineRefresh((n) => n + 1);
-      setTimelineDetailEntry((cur) =>
-        cur?.id === entry.id ? null : cur,
-      );
+  const handleDeleteTimelineEntryRequest = useCallback(
+    (entry: EmployeeTimelineEntryRow) => {
+      setPendingTimelineDelete(entry);
     },
-    [employeeId],
+    [],
   );
+
+  const confirmDeleteTimelineEntry = useCallback(async () => {
+    const entry = pendingTimelineDelete;
+    if (!employeeId || !entry) return;
+    setPendingTimelineDelete(null);
+    const { error } = await deleteEmployeeTimelineEntry(
+      employeeId,
+      entry.id,
+    );
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    toast.success("Timeline entry deleted");
+    setTimelineRefresh((n) => n + 1);
+    setTimelineDetailEntry((cur) =>
+      cur?.id === entry.id ? null : cur,
+    );
+  }, [employeeId, pendingTimelineDelete]);
 
   useEffect(() => {
     if (!employeeId) return;
@@ -629,6 +641,10 @@ export function EmployeeDetailModal({
     document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
+      if (timelineDeleteConfirmRef.current) {
+        setPendingTimelineDelete(null);
+        return;
+      }
       if (timelineEditOpenRef.current) {
         setTimelineEditEntry(null);
         return;
@@ -1026,7 +1042,7 @@ export function EmployeeDetailModal({
                             onOpen={() => setTimelineDetailEntry(entry)}
                             canEditTimeline={canEditTimeline}
                             onEdit={setTimelineEditEntry}
-                            onDelete={handleDeleteTimelineEntry}
+                            onDelete={handleDeleteTimelineEntryRequest}
                           />
                         </li>
                       ))}
@@ -1093,6 +1109,19 @@ export function EmployeeDetailModal({
           }}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={pendingTimelineDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingTimelineDelete(null);
+        }}
+        title="Delete timeline entry?"
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => void confirmDeleteTimelineEntry()}
+      />
     </div>
   );
 }

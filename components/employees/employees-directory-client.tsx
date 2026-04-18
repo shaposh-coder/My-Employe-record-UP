@@ -25,6 +25,7 @@ import { EmployeesImportExportToolbar } from "@/components/employees/employees-i
 import { EmployeesPagination } from "@/components/employees/employees-pagination";
 import { EmployeesTableLoadingOverlay } from "@/components/employees/employees-table-loading-overlay";
 import { EmployeesTable } from "@/components/employees/employees-table";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   deleteEmployeeRow,
   loadEmployeesDirectory,
@@ -86,6 +87,9 @@ export function EmployeesDirectoryClient({
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(
     null,
   );
+  const [pendingDeleteEmployeeId, setPendingDeleteEmployeeId] = useState<
+    string | null
+  >(null);
   const { visibility, setVisibility } = useEmployeesColumnVisibility();
 
   const [searchInput, setSearchInput] = useState("");
@@ -293,35 +297,32 @@ export function EmployeesDirectoryClient({
     };
   }, [directoryCriteriaKey, loadRows]);
 
-  const handleDelete = useCallback(
-    async (id: string) => {
-      if (
-        !window.confirm(
-          "Delete this employee? This cannot be undone.",
-        )
-      ) {
-        return;
-      }
-      const { error } = await deleteEmployeeRow(id);
-      if (error) {
-        toast.error("Could not delete employee", {
-          description: error,
-        });
-        return;
-      }
-      toast.success("Employee deleted");
-      const result = await loadRows();
-      if (
-        result &&
-        !result.error &&
-        result.rows.length === 0 &&
-        page > 1
-      ) {
-        setPage((p) => p - 1);
-      }
-    },
-    [loadRows, page],
-  );
+  const handleDeleteRequest = useCallback((id: string) => {
+    setPendingDeleteEmployeeId(id);
+  }, []);
+
+  const confirmDeleteEmployee = useCallback(async () => {
+    const id = pendingDeleteEmployeeId;
+    if (!id) return;
+    setPendingDeleteEmployeeId(null);
+    const { error } = await deleteEmployeeRow(id);
+    if (error) {
+      toast.error("Could not delete employee", {
+        description: error,
+      });
+      return;
+    }
+    toast.success("Employee deleted");
+    const result = await loadRows();
+    if (
+      result &&
+      !result.error &&
+      result.rows.length === 0 &&
+      page > 1
+    ) {
+      setPage((p) => p - 1);
+    }
+  }, [loadRows, page, pendingDeleteEmployeeId]);
 
   const handleToggleStatus = useCallback(
     async (row: EmployeeListRow) => {
@@ -524,7 +525,7 @@ export function EmployeesDirectoryClient({
             rows={rows}
             visibility={visibility}
             directoryLoading={listLoading && rows.length === 0}
-            onDelete={handleDelete}
+            onDelete={handleDeleteRequest}
             onEmployeeNameClick={openEmployeeDetail}
             onToggleStatus={handleToggleStatus}
             statusUpdatingId={statusUpdatingId}
@@ -551,6 +552,19 @@ export function EmployeesDirectoryClient({
           setDetailRowSnapshot(null);
         }}
         canEdit={!readOnly}
+      />
+
+      <ConfirmDialog
+        open={pendingDeleteEmployeeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteEmployeeId(null);
+        }}
+        title="Delete employee?"
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => void confirmDeleteEmployee()}
       />
     </div>
   );

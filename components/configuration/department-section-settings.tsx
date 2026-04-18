@@ -32,6 +32,7 @@ import {
 import { normalizeTitleKey } from "@/lib/normalize-title-key";
 import { useUserAccess } from "@/components/dashboard/user-access-context";
 import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export type DirectoryItem = {
   id: string;
@@ -550,6 +551,14 @@ function DepartmentsWithNestedSections({
     | { mode: "edit"; section: SectionItem }
     | null
   >(null);
+  const [confirmDeleteDept, setConfirmDeleteDept] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [confirmDeleteSection, setConfirmDeleteSection] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   const deptAddModalTitleId = useId();
   const deptEditTitleId = useId();
@@ -890,10 +899,10 @@ function DepartmentsWithNestedSections({
                               }
                               onClick={() => {
                                 if (!selectedDeptMeta.canDeleteDept) return;
-                                const ok = window.confirm(
-                                  `Delete “${selectedDept.title}” and all its sections? This cannot be undone.`,
-                                );
-                                if (ok) void onDeleteDepartment(selectedDept.id);
+                                setConfirmDeleteDept({
+                                  id: selectedDept.id,
+                                  title: selectedDept.title,
+                                });
                               }}
                               className={[
                                 "inline-flex h-10 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition",
@@ -1013,10 +1022,10 @@ function DepartmentsWithNestedSections({
                                 }
                                 onClick={() => {
                                   if (deleteBlocked) return;
-                                  const ok = window.confirm(
-                                    `Delete “${item.title}”? This cannot be undone.`,
-                                  );
-                                  if (ok) void onDeleteSection(item.id);
+                                  setConfirmDeleteSection({
+                                    id: item.id,
+                                    title: item.title,
+                                  });
                                 }}
                                 className={[
                                   "rounded-xl p-2 transition",
@@ -1053,6 +1062,52 @@ function DepartmentsWithNestedSections({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteDept !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteDept(null);
+        }}
+        title="Delete department?"
+        description={
+          confirmDeleteDept ? (
+            <>
+              Delete “{confirmDeleteDept.title}” and all its sections? This
+              cannot be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          const c = confirmDeleteDept;
+          setConfirmDeleteDept(null);
+          if (c) void onDeleteDepartment(c.id);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDeleteSection !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteSection(null);
+        }}
+        title="Delete section?"
+        description={
+          confirmDeleteSection ? (
+            <>
+              Delete “{confirmDeleteSection.title}”? This cannot be undone.
+            </>
+          ) : null
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          const c = confirmDeleteSection;
+          setConfirmDeleteSection(null);
+          if (c) void onDeleteSection(c.id);
+        }}
+      />
     </section>
   );
 }

@@ -5,6 +5,7 @@ import { Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { loadUserAccessRowsServer } from "@/lib/actions/user-access-data";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   USER_ACCESS_ROLE_DESCRIPTIONS,
   USER_ACCESS_ROLE_LABELS,
@@ -68,6 +69,8 @@ export function UsersAccessSettings({
   /** Manager/viewer only; admin always has timeline access (ignored in save). */
   const [formTimelineAccess, setFormTimelineAccess] = useState(true);
   const [departmentTitles, setDepartmentTitles] = useState<string[]>([]);
+  const [pendingDeleteUser, setPendingDeleteUser] =
+    useState<UserAccessRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,18 +256,8 @@ export function UsersAccessSettings({
     void load();
   }
 
-  async function handleDelete(row: UserAccessRow) {
+  async function executeDeleteUser(row: UserAccessRow) {
     const hasLogin = Boolean(row.auth_user_id);
-    if (
-      !window.confirm(
-        hasLogin
-          ? `Remove ${row.email} from the app and delete their login?`
-          : `Remove access for ${row.email}? This row has no linked login (added before passwords were enabled).`,
-      )
-    ) {
-      return;
-    }
-
     const res = await fetch("/api/user-access", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -283,6 +276,10 @@ export function UsersAccessSettings({
     }
     toast.success(hasLogin ? "User and login removed" : "User removed from list");
     void load();
+  }
+
+  function handleDeleteRequest(row: UserAccessRow) {
+    setPendingDeleteUser(row);
   }
 
   return (
@@ -418,7 +415,7 @@ export function UsersAccessSettings({
                           </button>
                           <button
                             type="button"
-                            onClick={() => void handleDelete(row)}
+                            onClick={() => handleDeleteRequest(row)}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
                             aria-label={`Remove ${row.email}`}
                           >
@@ -680,6 +677,44 @@ export function UsersAccessSettings({
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={pendingDeleteUser !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteUser(null);
+        }}
+        title="Remove user?"
+        description={
+          pendingDeleteUser ? (
+            Boolean(pendingDeleteUser.auth_user_id) ? (
+              <>
+                Remove{" "}
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {pendingDeleteUser.email}
+                </span>{" "}
+                from the app and delete their login?
+              </>
+            ) : (
+              <>
+                Remove access for{" "}
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {pendingDeleteUser.email}
+                </span>
+                ? This row has no linked login (added before passwords were
+                enabled).
+              </>
+            )
+          ) : null
+        }
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => {
+          const row = pendingDeleteUser;
+          setPendingDeleteUser(null);
+          if (row) void executeDeleteUser(row);
+        }}
+      />
     </div>
   );
 }
