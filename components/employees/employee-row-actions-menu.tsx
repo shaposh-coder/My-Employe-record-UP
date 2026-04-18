@@ -9,7 +9,16 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Eye, Loader2, MoreVertical, Pencil, Power, Trash2 } from "lucide-react";
+import {
+  CalendarClock,
+  Eye,
+  Loader2,
+  MoreVertical,
+  Pencil,
+  Power,
+  Trash2,
+} from "lucide-react";
+import { EmployeeAddTimelineModal } from "./employee-add-timeline-modal";
 import type { EmployeeListRow } from "./employee-list-row";
 
 export function EmployeeRowActionsMenu({
@@ -18,15 +27,19 @@ export function EmployeeRowActionsMenu({
   onView,
   onToggleStatus,
   statusUpdatingId,
+  canAddTimeline = false,
 }: {
   row: EmployeeListRow;
   onDelete: (id: string) => void | Promise<void>;
   /** Opens the same employee detail modal as name / profile image. */
-  onView?: (id: string) => void;
+  onView?: (row: EmployeeListRow) => void;
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   statusUpdatingId?: string | null;
+  /** False hides “Add timeline” (manager without timeline permission). */
+  canAddTimeline?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [timelineOpen, setTimelineOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -107,11 +120,25 @@ export function EmployeeRowActionsMenu({
           className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-700/80"
           onClick={() => {
             close();
-            onView(row.id);
+            onView(row);
           }}
         >
           <Eye className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
           View
+        </button>
+      ) : null}
+      {canAddTimeline ? (
+        <button
+          type="button"
+          role="menuitem"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-700/80"
+          onClick={() => {
+            close();
+            setTimelineOpen(true);
+          }}
+        >
+          <CalendarClock className="h-4 w-4 shrink-0" strokeWidth={2} aria-hidden />
+          Add timeline
         </button>
       ) : null}
       {onToggleStatus ? (
@@ -172,6 +199,12 @@ export function EmployeeRowActionsMenu({
       {typeof document !== "undefined" && menu
         ? createPortal(menu, document.body)
         : null}
+      <EmployeeAddTimelineModal
+        open={timelineOpen}
+        onClose={() => setTimelineOpen(false)}
+        employeeId={row.id}
+        employeeName={row.full_name}
+      />
     </div>
   );
 }

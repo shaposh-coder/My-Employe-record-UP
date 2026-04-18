@@ -30,6 +30,7 @@ import {
   normalizeTitleKey as normalizeDirectoryTitleKey,
 } from "@/lib/configuration/format-directory-title";
 import { normalizeTitleKey } from "@/lib/normalize-title-key";
+import { useUserAccess } from "@/components/dashboard/user-access-context";
 import { EmployeeDetailModal } from "@/components/employees/employee-detail-modal";
 
 export type DirectoryItem = {
@@ -1096,6 +1097,7 @@ export function DepartmentSectionSettings({
     item: DirectoryItem;
   } | null>(null);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
+  const { canViewTimeline } = useUserAccess();
 
   const employeeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -1449,6 +1451,7 @@ export function DepartmentSectionSettings({
       <EmployeeDetailModal
         employeeId={detailEmployeeId}
         onClose={() => setDetailEmployeeId(null)}
+        showTimelineTab={canViewTimeline}
       />
       <EmployeesInDirectoryModal
         open={employeeListModal !== null}

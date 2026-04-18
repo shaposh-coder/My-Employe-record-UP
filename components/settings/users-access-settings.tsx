@@ -65,6 +65,8 @@ export function UsersAccessSettings({
   const [formNotes, setFormNotes] = useState("");
   const [formPassword, setFormPassword] = useState("");
   const [formAllowedDepartment, setFormAllowedDepartment] = useState("");
+  /** Manager/viewer only; admin always has timeline access (ignored in save). */
+  const [formTimelineAccess, setFormTimelineAccess] = useState(true);
   const [departmentTitles, setDepartmentTitles] = useState<string[]>([]);
 
   const load = useCallback(async () => {
@@ -127,6 +129,7 @@ export function UsersAccessSettings({
     setFormRole("viewer");
     setFormNotes("");
     setFormAllowedDepartment(ASSIGNED_DEPARTMENT_ALL_VALUE);
+    setFormTimelineAccess(true);
     setModalOpen(true);
   }
 
@@ -143,6 +146,9 @@ export function UsersAccessSettings({
         : row.allowed_department?.trim()
           ? row.allowed_department.trim()
           : ASSIGNED_DEPARTMENT_ALL_VALUE,
+    );
+    setFormTimelineAccess(
+      row.access_role === "admin" ? true : Boolean(row.timeline_access),
     );
     setModalOpen(true);
   }
@@ -201,6 +207,8 @@ export function UsersAccessSettings({
           full_name: name,
           access_role: formRole,
           allowed_department: scopeDepartment,
+          timeline_access:
+            formRole === "admin" ? true : formTimelineAccess,
           notes: formNotes.trim(),
         }),
       });
@@ -227,6 +235,8 @@ export function UsersAccessSettings({
         full_name: name,
         access_role: formRole,
         allowed_department: scopeDepartment,
+        timeline_access:
+          formRole === "admin" ? true : formTimelineAccess,
         notes: formNotes.trim(),
       })
       .eq("id", editingId);
@@ -535,6 +545,7 @@ export function UsersAccessSettings({
                     setFormRole(r);
                     if (r === "admin") {
                       setFormAllowedDepartment("");
+                      setFormTimelineAccess(true);
                     } else {
                       setFormAllowedDepartment((prev) =>
                         prev.trim() === ""
@@ -599,6 +610,36 @@ export function UsersAccessSettings({
                     role). Pick one department to limit the user to that
                     department only.
                   </p>
+                </div>
+              )}
+              {formRole === "admin" ? (
+                <p className="rounded-lg border border-violet-200/80 bg-violet-50/80 px-3 py-2 text-xs leading-relaxed text-violet-900 dark:border-violet-900/40 dark:bg-violet-950/30 dark:text-violet-100">
+                  <span className="font-medium">Timeline</span> is always
+                  available for admins (view and add on employees).
+                </p>
+              ) : (
+                <div className="rounded-lg border border-slate-200/90 bg-slate-50/50 px-3 py-2.5 dark:border-slate-600/80 dark:bg-slate-800/40">
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 dark:border-slate-600 dark:bg-slate-900"
+                      checked={formTimelineAccess}
+                      onChange={(e) => setFormTimelineAccess(e.target.checked)}
+                    />
+                    <span>
+                      <span className={labelClass}>Allow employee timeline</span>
+                      <span className="mt-0.5 block text-xs font-normal leading-relaxed text-slate-500 dark:text-slate-400">
+                        When enabled, this user can open the{" "}
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          Timeline
+                        </span>{" "}
+                        tab when viewing an employee.
+                        {formRole === "manager"
+                          ? " Managers with this option can also add timeline entries from the directory row menu."
+                          : " Viewers can view timelines only, not add."}
+                      </span>
+                    </span>
+                  </label>
                 </div>
               )}
               <div>

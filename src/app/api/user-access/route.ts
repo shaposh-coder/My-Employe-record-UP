@@ -105,6 +105,11 @@ export async function POST(req: Request) {
   const allowed_department: string | null =
     access_role === "admin" ? null : rawAllowedDept || null;
 
+  const timeline_access =
+    access_role === "admin"
+      ? true
+      : Boolean(body.timeline_access);
+
   if (password.length < MIN_PASSWORD_LEN) {
     return NextResponse.json(
       {
@@ -150,6 +155,7 @@ export async function POST(req: Request) {
     full_name,
     access_role,
     allowed_department,
+    timeline_access,
     notes,
     auth_user_id: userId,
   });

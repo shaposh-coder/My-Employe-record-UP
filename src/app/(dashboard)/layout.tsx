@@ -28,7 +28,9 @@ export default async function DashboardLayout({
   const email = normalizeUserAccessEmail(user.email);
   const { data: access } = await supabase
     .from("user_access")
-    .select("id, access_role, full_name, email, avatar_url, allowed_department")
+    .select(
+      "id, access_role, full_name, email, avatar_url, allowed_department, timeline_access",
+    )
     .eq("email", email)
     .maybeSingle();
 
@@ -39,6 +41,12 @@ export default async function DashboardLayout({
   const accessRole = access.access_role as UserAccessRole;
   const avatarRaw = access.avatar_url as string | null | undefined;
   const allowedRaw = access.allowed_department as string | null | undefined;
+  const timelineFlag = Boolean(access.timeline_access);
+  const canViewTimeline =
+    accessRole === "admin" || timelineFlag;
+  const canAddTimeline =
+    accessRole === "admin" ||
+    (accessRole === "manager" && timelineFlag);
   const profile = {
     role: accessRole,
     email: access.email as string,
@@ -56,6 +64,8 @@ export default async function DashboardLayout({
         : typeof allowedRaw === "string" && allowedRaw.trim() !== ""
           ? allowedRaw.trim()
           : null,
+    canViewTimeline,
+    canAddTimeline,
   };
 
   return (

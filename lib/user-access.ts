@@ -11,6 +11,11 @@ export type UserAccessRow = {
   access_role: UserAccessRole;
   /** When set, user is scoped to this department title (directory + dashboard). */
   allowed_department: string | null;
+  /**
+   * Managers/viewers: when true, may view timelines; managers may add entries.
+   * Ignored for admin in UI (admins always have full timeline access).
+   */
+  timeline_access: boolean;
   notes: string;
   /** Public URL for optional profile photo. */
   avatar_url?: string;
@@ -42,13 +47,16 @@ export async function fetchUserAccessRows(
   const { data, error } = await supabase
     .from("user_access")
     .select(
-      "id, email, full_name, access_role, allowed_department, notes, avatar_url, auth_user_id, created_at, updated_at",
+      "id, email, full_name, access_role, allowed_department, timeline_access, notes, avatar_url, auth_user_id, created_at, updated_at",
     )
     .order("created_at", { ascending: true });
 
   if (error) {
     return { rows: [], error: error.message };
   }
-  const rows = (data ?? []) as UserAccessRow[];
+  const rows = (data ?? []).map((r) => ({
+    ...(r as UserAccessRow),
+    timeline_access: Boolean((r as UserAccessRow).timeline_access),
+  }));
   return { rows, error: null };
 }

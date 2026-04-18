@@ -11,6 +11,10 @@ export type UserAccessContextValue = {
   userAccessId: string;
   /** Department title scope — null = no restriction. */
   allowedDepartment: string | null;
+  /** Admins always true; manager/viewer follows `user_access.timeline_access`. */
+  canViewTimeline: boolean;
+  /** Add/save timeline entries (managers with flag, or admin). Viewers never. */
+  canAddTimeline: boolean;
 };
 
 const UserAccessContext = createContext<UserAccessContextValue | null>(null);

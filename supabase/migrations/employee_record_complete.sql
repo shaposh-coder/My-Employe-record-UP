@@ -220,6 +220,44 @@ comment on column public.employees.family_phone_alt is 'Father phone (alternate)
 alter table public.employees enable row level security;
 
 -- -----------------------------------------------------------------------------
+-- Employee timeline entries (history per employee, ordered by date / created)
+-- -----------------------------------------------------------------------------
+create table if not exists public.employee_timeline_entries (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null
+    references public.employees (id) on delete cascade,
+  entry_date date not null,
+  created_at timestamptz not null default now(),
+  punctuality text,
+  punctuality_comment text not null default '',
+  behaviour text,
+  behaviour_comment text not null default '',
+  honesty text,
+  criminal_misconduct text,
+  dressing_appearance_comment text not null default '',
+  effort text,
+  others text not null default '',
+  constraint employee_timeline_punctuality_chk
+    check (punctuality is null or punctuality in ('yes', 'no')),
+  constraint employee_timeline_behaviour_chk
+    check (behaviour is null or behaviour in ('professional', 'non_professional')),
+  constraint employee_timeline_honesty_chk
+    check (honesty is null or honesty in ('yes', 'no')),
+  constraint employee_timeline_criminal_chk
+    check (criminal_misconduct is null or criminal_misconduct in ('yes', 'no')),
+  constraint employee_timeline_effort_chk
+    check (effort is null or effort in ('hard_work', 'inactive'))
+);
+
+comment on table public.employee_timeline_entries is
+  'Per-date timeline notes for an employee; multiple rows per employee over time.';
+
+create index if not exists employee_timeline_entries_employee_date_created_idx
+  on public.employee_timeline_entries (employee_id, entry_date desc, created_at desc);
+
+alter table public.employee_timeline_entries enable row level security;
+
+-- -----------------------------------------------------------------------------
 -- User access (Settings)
 -- -----------------------------------------------------------------------------
 create table if not exists public.user_access (
@@ -247,6 +285,16 @@ alter table public.user_access
 comment on column public.user_access.allowed_department is 'When set, user only sees employees in this department (title match). Null/empty = all departments.';
 comment on column public.user_access.auth_user_id is 'auth.users.id when this row was created with login; null for legacy rows.';
 comment on column public.user_access.avatar_url is 'Public URL for optional profile photo (e.g. employee-docs bucket).';
+
+alter table public.user_access
+  add column if not exists timeline_access boolean not null default false;
+
+comment on column public.user_access.timeline_access is
+  'When true, manager/viewer may view employee timelines; managers may add entries. Admins ignore this column (full access).';
+
+update public.user_access
+set timeline_access = true
+where timeline_access is false;
 
 create unique index if not exists user_access_email_lower_unique
   on public.user_access (lower(trim(email)));
@@ -410,6 +458,61 @@ $$;
 
 revoke all on function public.app_can_write_directory() from public;
 grant execute on function public.app_can_write_directory() to authenticated;
+
+create or replace function public.app_user_timeline_access_flag()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((
+    select ua.timeline_access
+    from public.user_access ua
+    where lower(trim(ua.email)) = lower(trim(coalesce(auth.jwt()->>'email', '')))
+    limit 1
+  ), false);
+$$;
+
+revoke all on function public.app_user_timeline_access_flag() from public;
+grant execute on function public.app_user_timeline_access_flag() to authenticated;
+
+create or replace function public.app_can_view_timeline()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    case public.app_user_role()
+      when 'admin' then true
+      when 'manager' then public.app_user_timeline_access_flag()
+      when 'viewer' then public.app_user_timeline_access_flag()
+      else false
+    end;
+$$;
+
+revoke all on function public.app_can_view_timeline() from public;
+grant execute on function public.app_can_view_timeline() to authenticated;
+
+create or replace function public.app_can_edit_timeline()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    case public.app_user_role()
+      when 'admin' then true
+      when 'manager' then public.app_user_timeline_access_flag()
+      else false
+    end;
+$$;
+
+revoke all on function public.app_can_edit_timeline() from public;
+grant execute on function public.app_can_edit_timeline() to authenticated;
 
 create or replace function public.update_my_profile(
   p_full_name text,
@@ -656,6 +759,40 @@ create policy "user_access_delete_block"
   to authenticated
   using (false);
 
+drop policy if exists "employee_timeline_entries_select_authenticated"
+  on public.employee_timeline_entries;
+drop policy if exists "employee_timeline_entries_insert_writers"
+  on public.employee_timeline_entries;
+drop policy if exists "employee_timeline_entries_update_writers"
+  on public.employee_timeline_entries;
+drop policy if exists "employee_timeline_entries_delete_writers"
+  on public.employee_timeline_entries;
+
+create policy "employee_timeline_entries_select_authenticated"
+  on public.employee_timeline_entries
+  for select
+  to authenticated
+  using (public.app_can_view_timeline());
+
+create policy "employee_timeline_entries_insert_writers"
+  on public.employee_timeline_entries
+  for insert
+  to authenticated
+  with check (public.app_can_edit_timeline());
+
+create policy "employee_timeline_entries_update_writers"
+  on public.employee_timeline_entries
+  for update
+  to authenticated
+  using (public.app_can_edit_timeline())
+  with check (public.app_can_edit_timeline());
+
+create policy "employee_timeline_entries_delete_writers"
+  on public.employee_timeline_entries
+  for delete
+  to authenticated
+  using (public.app_can_edit_timeline());
+
 -- -----------------------------------------------------------------------------
 -- Storage: employee-docs
 -- -----------------------------------------------------------------------------
@@ -764,6 +901,7 @@ grant usage on schema public to anon, authenticated, service_role;
 grant all on table public.departments to anon, authenticated, service_role;
 grant all on table public.sections to anon, authenticated, service_role;
 grant all on table public.employees to anon, authenticated, service_role;
+grant all on table public.employee_timeline_entries to anon, authenticated, service_role;
 grant all on table public.user_access to anon, authenticated, service_role;
 
 -- -----------------------------------------------------------------------------
@@ -854,13 +992,15 @@ begin
     full_name,
     access_role,
     notes,
-    auth_user_id
+    auth_user_id,
+    timeline_access
   )
   values (
     v_email,
     'Admin',
     'admin',
     'Seeded default admin — change password after first login.',
-    v_user_id
+    v_user_id,
+    true
   );
 end $$;

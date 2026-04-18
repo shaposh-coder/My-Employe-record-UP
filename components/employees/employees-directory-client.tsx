@@ -27,7 +27,6 @@ import { EmployeesTableLoadingOverlay } from "@/components/employees/employees-t
 import { EmployeesTable } from "@/components/employees/employees-table";
 import {
   deleteEmployeeRow,
-  loadDirectoryFilterOptions,
   loadEmployeesDirectory,
   updateEmployeeStatusRow,
 } from "@/lib/actions/employees-data";
@@ -62,7 +61,8 @@ export function EmployeesDirectoryClient({
 }: EmployeesDirectoryClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { role, allowedDepartment } = useUserAccess();
+  const { role, allowedDepartment, canViewTimeline, canAddTimeline } =
+    useUserAccess();
   const scopedDept = allowedDepartment?.trim() ?? "";
 
   const departmentParam = searchParams.get("department") ?? "";
@@ -80,6 +80,9 @@ export function EmployeesDirectoryClient({
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(
     null,
   );
+  /** Snapshot from table for instant modal content while full row loads. */
+  const [detailRowSnapshot, setDetailRowSnapshot] =
+    useState<EmployeeListRow | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(
     null,
   );
@@ -290,20 +293,6 @@ export function EmployeesDirectoryClient({
     };
   }, [directoryCriteriaKey, loadRows]);
 
-  useEffect(() => {
-    function onFocus() {
-      void loadRows();
-      void loadDirectoryFilterOptions().then((r) => {
-        if (r.error) return;
-        setDepartmentOptions(r.departments);
-        setSectionOptions(r.sections);
-        setCityOptions(r.cities);
-      });
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [loadRows]);
-
   const handleDelete = useCallback(
     async (id: string) => {
       if (
@@ -421,8 +410,9 @@ export function EmployeesDirectoryClient({
     [router, searchParams],
   );
 
-  const openEmployeeDetail = useCallback((id: string) => {
-    setDetailEmployeeId(id);
+  const openEmployeeDetail = useCallback((row: EmployeeListRow) => {
+    setDetailRowSnapshot(row);
+    setDetailEmployeeId(row.id);
   }, []);
 
   const employeesTopbarSlot = useMemo(
@@ -467,6 +457,7 @@ export function EmployeesDirectoryClient({
           {readOnly ? null : (
             <Link
               href="/employees/new"
+              prefetch={false}
               className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white sm:px-4"
             >
               <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -529,6 +520,7 @@ export function EmployeesDirectoryClient({
           <EmployeesTable
             embedInCard
             readOnly={readOnly}
+            canAddTimeline={canAddTimeline}
             rows={rows}
             visibility={visibility}
             directoryLoading={listLoading && rows.length === 0}
@@ -551,7 +543,12 @@ export function EmployeesDirectoryClient({
 
       <EmployeeDetailModal
         employeeId={detailEmployeeId}
-        onClose={() => setDetailEmployeeId(null)}
+        initialListRow={detailRowSnapshot}
+        showTimelineTab={canViewTimeline}
+        onClose={() => {
+          setDetailEmployeeId(null);
+          setDetailRowSnapshot(null);
+        }}
         canEdit={!readOnly}
       />
     </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CalendarClock,
   ExternalLink,
   FileImage,
   Loader2,
@@ -18,6 +19,11 @@ import {
   type SocialLinksRecord,
 } from "@/lib/social-links";
 import { loadEmployeeFullForModal } from "@/lib/actions/employees-data";
+import {
+  loadEmployeeTimelineEntries,
+  type EmployeeTimelineEntryRow,
+} from "@/lib/actions/employee-timeline-data";
+import type { EmployeeListRow } from "./employee-list-row";
 import { SocialPlatformIcon } from "./social-platform-icons";
 
 const TABS = [
@@ -26,6 +32,7 @@ const TABS = [
   { id: "social", label: "Social & reference" },
   { id: "family", label: "Family" },
   { id: "documents", label: "Documents" },
+  { id: "timeline", label: "Timeline" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -118,6 +125,200 @@ function DocumentCard({
   );
 }
 
+function fmtTimelineYesNo(v: string | null): string {
+  if (v === "yes") return "Yes";
+  if (v === "no") return "No";
+  return "—";
+}
+
+function fmtTimelineBehaviour(v: string | null): string {
+  if (v === "professional") return "Professional";
+  if (v === "non_professional") return "Non-Professional";
+  return "—";
+}
+
+function fmtTimelineEffort(v: string | null): string {
+  if (v === "hard_work") return "Hard work";
+  if (v === "inactive") return "Inactive";
+  return "—";
+}
+
+function formatEntryDate(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-");
+  if (!y || !m || !d) return isoDate;
+  try {
+    return new Date(Number(y), Number(m) - 1, Number(d)).toLocaleDateString();
+  } catch {
+    return isoDate;
+  }
+}
+
+/** Label left, main value (e.g. Yes/No / radio) right — same row (compact). */
+function TimelineRowLabelValue({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+      <span className="min-w-0 text-xs font-medium text-slate-800 dark:text-slate-200">
+        {label}
+      </span>
+      <span className="shrink-0 text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/** Shown only when `text` is non-empty (no separate “Comment” label). */
+function TimelineCommentBlock({ text }: { text: string }) {
+  return (
+    <div className="mt-1 rounded-md border border-slate-100 bg-slate-50/90 px-2 py-1.5 dark:border-slate-600/60 dark:bg-slate-800/50">
+      <p className="whitespace-pre-wrap text-xs leading-snug text-slate-800 dark:text-slate-100">
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function timelineEntryHasContent(e: EmployeeTimelineEntryRow): boolean {
+  if (e.punctuality != null) return true;
+  if (txt(e.punctuality_comment)) return true;
+  if (e.behaviour != null) return true;
+  if (txt(e.behaviour_comment)) return true;
+  if (e.honesty != null) return true;
+  if (e.criminal_misconduct != null) return true;
+  if (txt(e.dressing_appearance_comment)) return true;
+  if (e.effort != null) return true;
+  if (txt(e.others)) return true;
+  return false;
+}
+
+function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
+  const pc = txt(e.punctuality_comment);
+  const bc = txt(e.behaviour_comment);
+  const dress = txt(e.dressing_appearance_comment);
+  const oth = txt(e.others);
+
+  const hasMainPunctuality = e.punctuality != null;
+  const hasMainBehaviour = e.behaviour != null;
+
+  const created = e.created_at
+    ? new Date(e.created_at).toLocaleString()
+    : "";
+
+  const punctualitySection = hasMainPunctuality || pc;
+  const behaviourSection = hasMainBehaviour || bc;
+
+  return (
+    <article className="overflow-hidden rounded-xl border border-violet-200/80 bg-white/90 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/50">
+      <div className="border-b border-violet-100/90 bg-gradient-to-r from-violet-50/80 to-fuchsia-50/50 px-3 py-2 dark:border-violet-900/40 dark:from-violet-950/40 dark:to-slate-900/80">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {formatEntryDate(e.entry_date)}
+          </h4>
+          {created ? (
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">
+              Saved {created}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {!timelineEntryHasContent(e) ? (
+        <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+          No fields filled for this entry.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-0 px-3 py-2">
+          {punctualitySection ? (
+            <div className="border-b border-slate-100 pb-2 dark:border-slate-700/80">
+              <TimelineRowLabelValue
+                label="Punctuality"
+                value={
+                  hasMainPunctuality
+                    ? fmtTimelineYesNo(e.punctuality)
+                    : "—"
+                }
+              />
+              {pc ? <TimelineCommentBlock text={pc} /> : null}
+            </div>
+          ) : null}
+
+          {behaviourSection ? (
+            <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
+              <TimelineRowLabelValue
+                label="Behaviour"
+                value={
+                  hasMainBehaviour
+                    ? fmtTimelineBehaviour(e.behaviour)
+                    : "—"
+                }
+              />
+              {bc ? <TimelineCommentBlock text={bc} /> : null}
+            </div>
+          ) : null}
+
+          {e.honesty != null ? (
+            <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
+              <TimelineRowLabelValue
+                label="Honesty"
+                value={fmtTimelineYesNo(e.honesty)}
+              />
+            </div>
+          ) : null}
+
+          {e.criminal_misconduct != null ? (
+            <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
+              <TimelineRowLabelValue
+                label="Criminal / Misconduct"
+                value={fmtTimelineYesNo(e.criminal_misconduct)}
+              />
+            </div>
+          ) : null}
+
+          {dress ? (
+            <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-0.5">
+                <span className="min-w-0 shrink-0 text-xs font-medium text-slate-800 dark:text-slate-200">
+                  Dressing / Appearance
+                </span>
+                <span className="min-w-0 max-w-[min(100%,28rem)] text-right text-xs font-medium text-slate-900 dark:text-slate-100">
+                  <span className="whitespace-pre-wrap">{dress}</span>
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          {e.effort != null ? (
+            <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
+              <TimelineRowLabelValue
+                label="Effort / Work ethic"
+                value={fmtTimelineEffort(e.effort)}
+              />
+            </div>
+          ) : null}
+
+          {oth ? (
+            <div className="pt-0.5">
+              <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                <span className="min-w-0 shrink-0 text-xs font-medium text-slate-800 dark:text-slate-200">
+                  Others
+                </span>
+                <span className="min-w-0 max-w-[min(100%,28rem)] text-right text-xs font-medium text-slate-900 dark:text-slate-100">
+                  <span className="whitespace-pre-wrap">{oth}</span>
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </article>
+  );
+}
+
 function parseOtherDocs(raw: unknown): { url: string; label: string }[] {
   if (!Array.isArray(raw)) return [];
   const out: { url: string; label: string }[] = [];
@@ -138,31 +339,55 @@ function parseOtherDocs(raw: unknown): { url: string; label: string }[] {
 
 export function EmployeeDetailModal({
   employeeId,
+  /** From directory table — shows immediately while full row (e.g. documents) loads. */
+  initialListRow = null,
   onClose,
   /** When false, hide Edit (viewer / read-only). Default true for backward compatibility. */
   canEdit = true,
+  /** When false, hide Timeline tab (no permission). Default true. */
+  showTimelineTab = true,
 }: {
   employeeId: string | null;
+  initialListRow?: EmployeeListRow | null;
   onClose: () => void;
   canEdit?: boolean;
+  showTimelineTab?: boolean;
 }) {
+  const detailTabs = useMemo(
+    () =>
+      showTimelineTab
+        ? TABS
+        : TABS.filter((t) => t.id !== "timeline"),
+    [showTimelineTab],
+  );
   const [activeTab, setActiveTab] = useState<TabId>("personal");
   const tabScrollRef = useRef<HTMLDivElement>(null);
   const [row, setRow] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timelineRows, setTimelineRows] = useState<EmployeeTimelineEntryRow[] | null>(
+    null,
+  );
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+  const [timelineRefresh, setTimelineRefresh] = useState(0);
+  /** Set in effect before fetch — if full load fails, keep table preview visible. */
+  const hadListPreviewRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!employeeId) return;
-    setLoading(true);
-    setError(null);
     const { data, error: err } = await loadEmployeeFullForModal(employeeId);
     setLoading(false);
     if (err || !data) {
+      if (hadListPreviewRef.current) {
+        setError(null);
+        return;
+      }
       setRow(null);
       setError(err ?? "Not found");
       return;
     }
+    setError(null);
     setRow(data);
   }, [employeeId]);
 
@@ -170,17 +395,71 @@ export function EmployeeDetailModal({
     if (!employeeId) {
       setRow(null);
       setError(null);
+      setLoading(false);
       setActiveTab("personal");
+      hadListPreviewRef.current = false;
+      setTimelineRows(null);
+      setTimelineError(null);
       return;
     }
+    setTimelineRows(null);
+    setTimelineError(null);
     setActiveTab("personal");
+    setError(null);
+    const withPreview = initialListRow?.id === employeeId;
+    hadListPreviewRef.current = withPreview;
+    if (withPreview) {
+      setRow(initialListRow as unknown as Record<string, unknown>);
+      setLoading(false);
+    } else {
+      setRow(null);
+      setLoading(true);
+    }
     void load();
-  }, [employeeId, load]);
+  }, [employeeId, initialListRow, load]);
 
   useEffect(() => {
     const el = tabScrollRef.current;
     if (el) el.scrollTop = 0;
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!showTimelineTab && activeTab === "timeline") {
+      setActiveTab("personal");
+    }
+  }, [showTimelineTab, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "timeline" || !employeeId || !showTimelineTab) return;
+    let cancelled = false;
+    setTimelineLoading(true);
+    setTimelineError(null);
+    void loadEmployeeTimelineEntries(employeeId).then(({ data, error: err }) => {
+      if (cancelled) return;
+      setTimelineLoading(false);
+      if (err) {
+        setTimelineError(err);
+        setTimelineRows(null);
+        return;
+      }
+      setTimelineRows(data ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, employeeId, timelineRefresh, showTimelineTab]);
+
+  useEffect(() => {
+    function onTimelineSaved(ev: Event) {
+      const detail = (ev as CustomEvent<{ employeeId?: string }>).detail;
+      if (detail?.employeeId === employeeId) {
+        setTimelineRefresh((n) => n + 1);
+      }
+    }
+    window.addEventListener("employee-timeline-saved", onTimelineSaved);
+    return () =>
+      window.removeEventListener("employee-timeline-saved", onTimelineSaved);
+  }, [employeeId]);
 
   useEffect(() => {
     if (!employeeId) return;
@@ -282,7 +561,7 @@ export function EmployeeDetailModal({
           aria-label="Detail sections"
           className="flex shrink-0 flex-wrap gap-1 border-b border-slate-100 bg-slate-50/90 px-2 py-2 dark:border-slate-800 dark:bg-slate-950/60"
         >
-          {TABS.map((tab) => {
+          {detailTabs.map((tab) => {
             const selected = activeTab === tab.id;
             return (
               <button
@@ -306,7 +585,11 @@ export function EmployeeDetailModal({
 
         <div
           ref={tabScrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6"
+          className={
+            activeTab === "timeline" && showTimelineTab
+              ? "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3"
+              : "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6"
+          }
         >
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-slate-500">
@@ -528,6 +811,50 @@ export function EmployeeDetailModal({
                       />
                     </div>
                   </section>
+                </div>
+              ) : null}
+
+              {activeTab === "timeline" && showTimelineTab ? (
+                <div className="space-y-2">
+                  {timelineLoading ? (
+                    <div className="flex items-center justify-center gap-2 rounded-xl border border-violet-200/80 bg-violet-50/40 px-3 py-6 text-xs text-slate-600 dark:border-violet-900/40 dark:bg-violet-950/20 dark:text-slate-300">
+                      <Loader2
+                        className="h-4 w-4 shrink-0 animate-spin text-violet-600 dark:text-violet-400"
+                        strokeWidth={2}
+                        aria-hidden
+                      />
+                      Loading timeline…
+                    </div>
+                  ) : timelineError ? (
+                    <div className="rounded-xl border border-amber-200/90 bg-amber-50/80 px-3 py-2.5 text-xs text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+                      {timelineError}
+                    </div>
+                  ) : !timelineRows || timelineRows.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-violet-200/90 bg-gradient-to-br from-violet-50/60 via-white to-slate-50/80 px-4 py-6 text-center dark:border-violet-900/40 dark:from-violet-950/25 dark:via-slate-900 dark:to-slate-950/80">
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-md shadow-violet-500/20">
+                        <CalendarClock
+                          className="h-5 w-5"
+                          strokeWidth={1.75}
+                        />
+                      </div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        No timeline entries yet
+                      </h3>
+                      <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+                        Use <span className="font-medium">Add timeline</span>{" "}
+                        from the directory row menu to record observations.
+                        Newest entries appear here first.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {timelineRows.map((entry) => (
+                        <li key={entry.id}>
+                          <TimelineEntryCard e={entry} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ) : null}
             </>

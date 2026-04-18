@@ -22,12 +22,11 @@ function fmt(value: string | null | undefined): ReactNode {
 }
 
 function profileImageCell(
-  url: string | null | undefined,
-  onOpenDetail?: (id: string) => void,
-  employeeId?: string,
+  row: EmployeeListRow,
+  onOpenDetail?: (row: EmployeeListRow) => void,
 ): ReactNode {
-  const u = url?.trim();
-  const clickable = Boolean(onOpenDetail && employeeId);
+  const u = row.profile_image?.trim();
+  const clickable = Boolean(onOpenDetail);
 
   const inner =
     !u ? (
@@ -50,7 +49,7 @@ function profileImageCell(
         type="button"
         className="inline-flex rounded-full text-left transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-slate-500 dark:focus-visible:ring-offset-slate-900"
         aria-label="View employee details"
-        onClick={() => onOpenDetail!(employeeId!)}
+        onClick={() => onOpenDetail!(row)}
       >
         {inner}
       </button>
@@ -105,17 +104,17 @@ function columnMinClass(colId: EmployeeColumnId): string {
 
 function buildColumnDefs(
   onDelete: (id: string) => void | Promise<void>,
-  onEmployeeNameClick: ((id: string) => void) | undefined,
+  onEmployeeNameClick: ((row: EmployeeListRow) => void) | undefined,
   onToggleStatus: ((row: EmployeeListRow) => void | Promise<void>) | undefined,
   statusUpdatingId: string | null | undefined,
+  canAddTimeline: boolean,
 ): ColDef[] {
   return [
     {
       id: "image",
       header: "IMAGE",
       thClass: "text-left",
-      cell: (row) =>
-        profileImageCell(row.profile_image, onEmployeeNameClick, row.id),
+      cell: (row) => profileImageCell(row, onEmployeeNameClick),
       tdClass: "align-middle",
     },
     {
@@ -125,7 +124,7 @@ function buildColumnDefs(
         onEmployeeNameClick ? (
           <button
             type="button"
-            onClick={() => onEmployeeNameClick(row.id)}
+            onClick={() => onEmployeeNameClick(row)}
             className="text-left font-medium text-slate-900 underline-offset-2 hover:underline dark:text-slate-100"
           >
             {fmt(row.full_name)}
@@ -264,6 +263,7 @@ function buildColumnDefs(
           onView={onEmployeeNameClick}
           onToggleStatus={onToggleStatus}
           statusUpdatingId={statusUpdatingId}
+          canAddTimeline={canAddTimeline}
         />
       ),
     },
@@ -277,6 +277,8 @@ export function EmployeesTable({
   onEmployeeNameClick,
   onToggleStatus,
   statusUpdatingId,
+  /** When true, show Add timeline in row menu (manager/admin with flag). */
+  canAddTimeline = false,
   /** When true, hide row actions (viewer / read-only). */
   readOnly = false,
   /** When true, no outer card border/radius — use inside a parent card with a footer. */
@@ -287,11 +289,12 @@ export function EmployeesTable({
   rows: EmployeeListRow[];
   visibility: Record<EmployeeColumnId, boolean>;
   onDelete: (id: string) => void | Promise<void>;
-  onEmployeeNameClick?: (id: string) => void;
+  onEmployeeNameClick?: (row: EmployeeListRow) => void;
   /** Toggle between Active and Un-Active (database constraint). */
   onToggleStatus?: (row: EmployeeListRow) => void | Promise<void>;
   /** When set, the status button for this row shows a spinner. */
   statusUpdatingId?: string | null;
+  canAddTimeline?: boolean;
   readOnly?: boolean;
   embedInCard?: boolean;
   directoryLoading?: boolean;
@@ -301,6 +304,7 @@ export function EmployeesTable({
     onEmployeeNameClick,
     onToggleStatus,
     statusUpdatingId,
+    canAddTimeline,
   ).filter((d) => !(readOnly && d.id === "action"));
   const effectiveVisibility = ensureFixedColumnVisibility(visibility);
   const filtered = defs.filter((d) => effectiveVisibility[d.id] === true);
