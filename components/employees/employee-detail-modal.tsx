@@ -190,9 +190,12 @@ function timelineEntryHasContent(e: EmployeeTimelineEntryRow): boolean {
   if (e.behaviour != null) return true;
   if (txt(e.behaviour_comment)) return true;
   if (e.honesty != null) return true;
+  if (txt(e.honesty_comment)) return true;
   if (e.criminal_misconduct != null) return true;
+  if (txt(e.criminal_misconduct_comment)) return true;
   if (txt(e.dressing_appearance_comment)) return true;
   if (e.effort != null) return true;
+  if (txt(e.effort_comment)) return true;
   if (txt(e.others)) return true;
   return false;
 }
@@ -200,11 +203,17 @@ function timelineEntryHasContent(e: EmployeeTimelineEntryRow): boolean {
 function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
   const pc = txt(e.punctuality_comment);
   const bc = txt(e.behaviour_comment);
+  const hc = txt(e.honesty_comment);
+  const crmc = txt(e.criminal_misconduct_comment);
   const dress = txt(e.dressing_appearance_comment);
+  const effc = txt(e.effort_comment);
   const oth = txt(e.others);
 
   const hasMainPunctuality = e.punctuality != null;
   const hasMainBehaviour = e.behaviour != null;
+  const hasMainHonesty = e.honesty != null;
+  const hasMainCriminal = e.criminal_misconduct != null;
+  const hasMainEffort = e.effort != null;
 
   const created = e.created_at
     ? new Date(e.created_at).toLocaleString()
@@ -212,6 +221,9 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
 
   const punctualitySection = hasMainPunctuality || pc;
   const behaviourSection = hasMainBehaviour || bc;
+  const honestySection = hasMainHonesty || hc;
+  const criminalSection = hasMainCriminal || crmc;
+  const effortSection = hasMainEffort || effc;
 
   return (
     <article className="overflow-hidden rounded-xl border border-violet-200/80 bg-white/90 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/50">
@@ -261,21 +273,31 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
             </div>
           ) : null}
 
-          {e.honesty != null ? (
+          {honestySection ? (
             <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
               <TimelineRowLabelValue
                 label="Honesty"
-                value={fmtTimelineYesNo(e.honesty)}
+                value={
+                  hasMainHonesty
+                    ? fmtTimelineYesNo(e.honesty)
+                    : "—"
+                }
               />
+              {hc ? <TimelineCommentBlock text={hc} /> : null}
             </div>
           ) : null}
 
-          {e.criminal_misconduct != null ? (
+          {criminalSection ? (
             <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
               <TimelineRowLabelValue
                 label="Criminal / Misconduct"
-                value={fmtTimelineYesNo(e.criminal_misconduct)}
+                value={
+                  hasMainCriminal
+                    ? fmtTimelineYesNo(e.criminal_misconduct)
+                    : "—"
+                }
               />
+              {crmc ? <TimelineCommentBlock text={crmc} /> : null}
             </div>
           ) : null}
 
@@ -292,12 +314,17 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
             </div>
           ) : null}
 
-          {e.effort != null ? (
+          {effortSection ? (
             <div className="border-b border-slate-100 py-2 dark:border-slate-700/80">
               <TimelineRowLabelValue
                 label="Effort / Work ethic"
-                value={fmtTimelineEffort(e.effort)}
+                value={
+                  hasMainEffort
+                    ? fmtTimelineEffort(e.effort)
+                    : "—"
+                }
               />
+              {effc ? <TimelineCommentBlock text={effc} /> : null}
             </div>
           ) : null}
 

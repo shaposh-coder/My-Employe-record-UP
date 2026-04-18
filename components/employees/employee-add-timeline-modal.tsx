@@ -50,9 +50,12 @@ export function EmployeeAddTimelineModal({
   const [behaviour, setBehaviour] = useState<"" | "professional" | "non-professional">("");
   const [behaviourComment, setBehaviourComment] = useState("");
   const [honesty, setHonesty] = useState<YesNo>("");
+  const [honestyComment, setHonestyComment] = useState("");
   const [criminalRecord, setCriminalRecord] = useState<YesNo>("");
+  const [criminalRecordComment, setCriminalRecordComment] = useState("");
   const [dressingComment, setDressingComment] = useState("");
   const [effort, setEffort] = useState<"" | "hard-work" | "inactive">("");
+  const [effortComment, setEffortComment] = useState("");
   const [others, setOthers] = useState("");
 
   useEffect(() => {
@@ -64,9 +67,12 @@ export function EmployeeAddTimelineModal({
       setBehaviour("");
       setBehaviourComment("");
       setHonesty("");
+      setHonestyComment("");
       setCriminalRecord("");
+      setCriminalRecordComment("");
       setDressingComment("");
       setEffort("");
+      setEffortComment("");
       setOthers("");
       return;
     }
@@ -86,9 +92,12 @@ export function EmployeeAddTimelineModal({
       behaviour,
       behaviourComment,
       honesty,
+      honestyComment,
       criminalRecord,
+      criminalRecordComment,
       dressingComment,
       effort,
+      effortComment,
       others,
     };
     setSaving(true);
@@ -205,16 +214,14 @@ export function EmployeeAddTimelineModal({
                   </label>
                 </div>
               </div>
-              <label htmlFor={`pc-${employeeId}`} className={`${labelClass} mt-3`}>
-                Punctuality — comment
-              </label>
               <textarea
                 id={`pc-${employeeId}`}
                 rows={2}
-                className={`${inputClass} resize-y`}
+                className={`${inputClass} mt-3 resize-y`}
                 value={punctualityComment}
                 onChange={(e) => setPunctualityComment(e.target.value)}
                 placeholder="Add a comment…"
+                aria-label="Punctuality comment"
               />
             </div>
 
@@ -244,16 +251,14 @@ export function EmployeeAddTimelineModal({
                   </label>
                 </div>
               </div>
-              <label htmlFor={`bc-${employeeId}`} className={`${labelClass} mt-3`}>
-                Behaviour — comment
-              </label>
               <textarea
                 id={`bc-${employeeId}`}
                 rows={2}
-                className={`${inputClass} resize-y`}
+                className={`${inputClass} mt-3 resize-y`}
                 value={behaviourComment}
                 onChange={(e) => setBehaviourComment(e.target.value)}
                 placeholder="Add a comment…"
+                aria-label="Behaviour comment"
               />
             </div>
 
@@ -283,6 +288,15 @@ export function EmployeeAddTimelineModal({
                   </label>
                 </div>
               </div>
+              <textarea
+                id={`honesty-c-${employeeId}`}
+                rows={2}
+                className={`${inputClass} mt-3 resize-y`}
+                value={honestyComment}
+                onChange={(e) => setHonestyComment(e.target.value)}
+                placeholder="Add a comment…"
+                aria-label="Honesty comment"
+              />
             </div>
 
             <div className={sectionClass}>
@@ -315,6 +329,15 @@ export function EmployeeAddTimelineModal({
                   </label>
                 </div>
               </div>
+              <textarea
+                id={`criminal-c-${employeeId}`}
+                rows={2}
+                className={`${inputClass} mt-3 resize-y`}
+                value={criminalRecordComment}
+                onChange={(e) => setCriminalRecordComment(e.target.value)}
+                placeholder="Add a comment…"
+                aria-label="Criminal or misconduct comment"
+              />
             </div>
 
             <div className={sectionClass}>
@@ -357,6 +380,15 @@ export function EmployeeAddTimelineModal({
                   </label>
                 </div>
               </div>
+              <textarea
+                id={`effort-c-${employeeId}`}
+                rows={2}
+                className={`${inputClass} mt-3 resize-y`}
+                value={effortComment}
+                onChange={(e) => setEffortComment(e.target.value)}
+                placeholder="Add a comment…"
+                aria-label="Effort or work ethic comment"
+              />
             </div>
 
             <div className={sectionClass}>

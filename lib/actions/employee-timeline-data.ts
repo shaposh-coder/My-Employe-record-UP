@@ -9,9 +9,12 @@ export type SaveTimelinePayload = {
   behaviour: "" | "professional" | "non-professional";
   behaviourComment: string;
   honesty: "" | "yes" | "no";
+  honestyComment: string;
   criminalRecord: "" | "yes" | "no";
+  criminalRecordComment: string;
   dressingComment: string;
   effort: "" | "hard-work" | "inactive";
+  effortComment: string;
   others: string;
 };
 
@@ -25,9 +28,12 @@ export type EmployeeTimelineEntryRow = {
   behaviour: string | null;
   behaviour_comment: string | null;
   honesty: string | null;
+  honesty_comment: string | null;
   criminal_misconduct: string | null;
+  criminal_misconduct_comment: string | null;
   dressing_appearance_comment: string | null;
   effort: string | null;
+  effort_comment: string | null;
   others: string | null;
 };
 
@@ -69,9 +75,12 @@ export async function saveEmployeeTimelineEntry(
     behaviour: mapBehaviour(payload.behaviour),
     behaviour_comment: payload.behaviourComment.trim(),
     honesty: mapYesNo(payload.honesty),
+    honesty_comment: payload.honestyComment.trim(),
     criminal_misconduct: mapYesNo(payload.criminalRecord),
+    criminal_misconduct_comment: payload.criminalRecordComment.trim(),
     dressing_appearance_comment: payload.dressingComment.trim(),
     effort: mapEffort(payload.effort),
+    effort_comment: payload.effortComment.trim(),
     others: payload.others.trim(),
   });
 
@@ -83,7 +92,7 @@ export async function loadEmployeeTimelineEntries(employeeId: string) {
   const { data, error } = await supabase
     .from("employee_timeline_entries")
     .select(
-      "id, employee_id, entry_date, created_at, punctuality, punctuality_comment, behaviour, behaviour_comment, honesty, criminal_misconduct, dressing_appearance_comment, effort, others",
+      "id, employee_id, entry_date, created_at, punctuality, punctuality_comment, behaviour, behaviour_comment, honesty, honesty_comment, criminal_misconduct, criminal_misconduct_comment, dressing_appearance_comment, effort, effort_comment, others",
     )
     .eq("employee_id", employeeId)
     .order("entry_date", { ascending: false })

@@ -233,9 +233,12 @@ create table if not exists public.employee_timeline_entries (
   behaviour text,
   behaviour_comment text not null default '',
   honesty text,
+  honesty_comment text not null default '',
   criminal_misconduct text,
+  criminal_misconduct_comment text not null default '',
   dressing_appearance_comment text not null default '',
   effort text,
+  effort_comment text not null default '',
   others text not null default '',
   constraint employee_timeline_punctuality_chk
     check (punctuality is null or punctuality in ('yes', 'no')),
@@ -254,6 +257,13 @@ comment on table public.employee_timeline_entries is
 
 create index if not exists employee_timeline_entries_employee_date_created_idx
   on public.employee_timeline_entries (employee_id, entry_date desc, created_at desc);
+
+alter table public.employee_timeline_entries
+  add column if not exists honesty_comment text not null default '';
+alter table public.employee_timeline_entries
+  add column if not exists criminal_misconduct_comment text not null default '';
+alter table public.employee_timeline_entries
+  add column if not exists effort_comment text not null default '';
 
 alter table public.employee_timeline_entries enable row level security;
 
