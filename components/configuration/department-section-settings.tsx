@@ -1097,7 +1097,7 @@ export function DepartmentSectionSettings({
     item: DirectoryItem;
   } | null>(null);
   const [detailEmployeeId, setDetailEmployeeId] = useState<string | null>(null);
-  const { canViewTimeline } = useUserAccess();
+  const { canViewTimeline, canAddTimeline } = useUserAccess();
 
   const employeeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -1452,6 +1452,7 @@ export function DepartmentSectionSettings({
         employeeId={detailEmployeeId}
         onClose={() => setDetailEmployeeId(null)}
         showTimelineTab={canViewTimeline}
+        canEditTimeline={canAddTimeline}
       />
       <EmployeesInDirectoryModal
         open={employeeListModal !== null}

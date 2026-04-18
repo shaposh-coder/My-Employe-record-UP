@@ -545,6 +545,7 @@ export function EmployeesDirectoryClient({
         employeeId={detailEmployeeId}
         initialListRow={detailRowSnapshot}
         showTimelineTab={canViewTimeline}
+        canEditTimeline={canAddTimeline}
         onClose={() => {
           setDetailEmployeeId(null);
           setDetailRowSnapshot(null);

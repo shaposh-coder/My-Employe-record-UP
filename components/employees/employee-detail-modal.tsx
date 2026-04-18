@@ -8,10 +8,12 @@ import {
   FileImage,
   Loader2,
   Pencil,
+  Trash2,
   User,
   Users,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
   SOCIAL_LINK_KEYS,
   SOCIAL_PLATFORM_LABELS,
@@ -20,9 +22,11 @@ import {
 } from "@/lib/social-links";
 import { loadEmployeeFullForModal } from "@/lib/actions/employees-data";
 import {
+  deleteEmployeeTimelineEntry,
   loadEmployeeTimelineEntries,
   type EmployeeTimelineEntryRow,
 } from "@/lib/actions/employee-timeline-data";
+import { EmployeeAddTimelineModal } from "./employee-add-timeline-modal";
 import type { EmployeeListRow } from "./employee-list-row";
 import { SocialPlatformIcon } from "./social-platform-icons";
 
@@ -153,6 +157,20 @@ function formatEntryDate(isoDate: string): string {
   }
 }
 
+/** Prefer saved full name; otherwise email (legacy rows). */
+function timelineAddedByLabel(e: EmployeeTimelineEntryRow): string {
+  const name = txt(e.added_by_name);
+  if (name) return name;
+  return txt(e.added_by_email);
+}
+
+/** Last editor after an update; empty if the entry was never edited. */
+function timelineUpdatedByLabel(e: EmployeeTimelineEntryRow): string {
+  const name = txt(e.updated_by_name);
+  if (name) return name;
+  return txt(e.updated_by_email);
+}
+
 /** Label left, main value (e.g. Yes/No / radio) right — same row (compact). */
 function TimelineRowLabelValue({
   label,
@@ -218,6 +236,7 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
   const created = e.created_at
     ? new Date(e.created_at).toLocaleString()
     : "";
+  const addedByWho = timelineAddedByLabel(e);
 
   const punctualitySection = hasMainPunctuality || pc;
   const behaviourSection = hasMainBehaviour || bc;
@@ -228,14 +247,24 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
   return (
     <article className="overflow-hidden rounded-xl border border-violet-200/80 bg-white/90 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/50">
       <div className="border-b border-violet-100/90 bg-gradient-to-r from-violet-50/80 to-fuchsia-50/50 px-3 py-2 dark:border-violet-900/40 dark:from-violet-950/40 dark:to-slate-900/80">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-          <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            {formatEntryDate(e.entry_date)}
-          </h4>
-          {created ? (
-            <span className="text-[10px] text-slate-500 dark:text-slate-400">
-              Saved {created}
-            </span>
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {formatEntryDate(e.entry_date)}
+            </h4>
+            {created ? (
+              <p className="shrink-0 text-right text-[10px] leading-snug text-slate-500 dark:text-slate-400">
+                Saved {created}
+              </p>
+            ) : null}
+          </div>
+          {addedByWho ? (
+            <p className="flex justify-end text-[11px] text-slate-500 dark:text-slate-400">
+              Timeline added by{" "}
+              <span className="ml-1 font-medium text-slate-700 dark:text-slate-300">
+                {addedByWho}
+              </span>
+            </p>
           ) : null}
         </div>
       </div>
@@ -346,6 +375,76 @@ function TimelineEntryCard({ e }: { e: EmployeeTimelineEntryRow }) {
   );
 }
 
+function TimelineEntryListRow({
+  e,
+  onOpen,
+  canEditTimeline,
+  onEdit,
+  onDelete,
+}: {
+  e: EmployeeTimelineEntryRow;
+  onOpen: () => void;
+  canEditTimeline: boolean;
+  onEdit: (row: EmployeeTimelineEntryRow) => void;
+  onDelete: (row: EmployeeTimelineEntryRow) => void;
+}) {
+  const who = timelineAddedByLabel(e);
+  const updatedWho = timelineUpdatedByLabel(e);
+  return (
+    <div className="rounded-xl border border-violet-200/80 bg-white/90 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/50">
+      <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left text-sm font-semibold text-slate-900 transition hover:text-violet-700 dark:text-slate-100 dark:hover:text-violet-300"
+        >
+          {formatEntryDate(e.entry_date)}
+        </button>
+        {canEditTimeline ? (
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              aria-label="Edit timeline"
+              onClick={() => onEdit(e)}
+            >
+              <Pencil className="h-4 w-4" strokeWidth={2} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="rounded-lg p-1.5 text-slate-500 transition hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              aria-label="Delete timeline"
+              onClick={() => onDelete(e)}
+            >
+              <Trash2 className="h-4 w-4" strokeWidth={2} aria-hidden />
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full px-3 pb-2.5 text-right text-[11px] text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+      >
+        <span className="block">
+          Timeline added by{" "}
+          <span className="font-medium text-slate-700 dark:text-slate-300">
+            {who || "—"}
+          </span>
+        </span>
+        {updatedWho ? (
+          <span className="mt-1 block">
+            Timeline updated by{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {updatedWho}
+            </span>
+          </span>
+        ) : null}
+      </button>
+    </div>
+  );
+}
+
 function parseOtherDocs(raw: unknown): { url: string; label: string }[] {
   if (!Array.isArray(raw)) return [];
   const out: { url: string; label: string }[] = [];
@@ -373,12 +472,15 @@ export function EmployeeDetailModal({
   canEdit = true,
   /** When false, hide Timeline tab (no permission). Default true. */
   showTimelineTab = true,
+  /** Edit/delete timeline entries (manager with timeline + admin). */
+  canEditTimeline = false,
 }: {
   employeeId: string | null;
   initialListRow?: EmployeeListRow | null;
   onClose: () => void;
   canEdit?: boolean;
   showTimelineTab?: boolean;
+  canEditTimeline?: boolean;
 }) {
   const detailTabs = useMemo(
     () =>
@@ -398,6 +500,14 @@ export function EmployeeDetailModal({
   const [timelineLoading, setTimelineLoading] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [timelineRefresh, setTimelineRefresh] = useState(0);
+  const [timelineDetailEntry, setTimelineDetailEntry] =
+    useState<EmployeeTimelineEntryRow | null>(null);
+  const [timelineEditEntry, setTimelineEditEntry] =
+    useState<EmployeeTimelineEntryRow | null>(null);
+  const timelineEditOpenRef = useRef(false);
+  timelineEditOpenRef.current = timelineEditEntry !== null;
+  const timelineDetailOpenRef = useRef(false);
+  timelineDetailOpenRef.current = timelineDetailEntry !== null;
   /** Set in effect before fetch — if full load fails, keep table preview visible. */
   const hadListPreviewRef = useRef(false);
 
@@ -427,10 +537,14 @@ export function EmployeeDetailModal({
       hadListPreviewRef.current = false;
       setTimelineRows(null);
       setTimelineError(null);
+      setTimelineDetailEntry(null);
+      setTimelineEditEntry(null);
       return;
     }
     setTimelineRows(null);
     setTimelineError(null);
+    setTimelineDetailEntry(null);
+    setTimelineEditEntry(null);
     setActiveTab("personal");
     setError(null);
     const withPreview = initialListRow?.id === employeeId;
@@ -488,12 +602,42 @@ export function EmployeeDetailModal({
       window.removeEventListener("employee-timeline-saved", onTimelineSaved);
   }, [employeeId]);
 
+  const handleDeleteTimelineEntry = useCallback(
+    async (entry: EmployeeTimelineEntryRow) => {
+      if (!employeeId) return;
+      if (!window.confirm("Delete this timeline entry?")) return;
+      const { error } = await deleteEmployeeTimelineEntry(
+        employeeId,
+        entry.id,
+      );
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      toast.success("Timeline entry deleted");
+      setTimelineRefresh((n) => n + 1);
+      setTimelineDetailEntry((cur) =>
+        cur?.id === entry.id ? null : cur,
+      );
+    },
+    [employeeId],
+  );
+
   useEffect(() => {
     if (!employeeId) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (timelineEditOpenRef.current) {
+        setTimelineEditEntry(null);
+        return;
+      }
+      if (timelineDetailOpenRef.current) {
+        setTimelineDetailEntry(null);
+        return;
+      }
+      onClose();
     }
     document.addEventListener("keydown", onKey);
     return () => {
@@ -877,7 +1021,13 @@ export function EmployeeDetailModal({
                     <ul className="space-y-2">
                       {timelineRows.map((entry) => (
                         <li key={entry.id}>
-                          <TimelineEntryCard e={entry} />
+                          <TimelineEntryListRow
+                            e={entry}
+                            onOpen={() => setTimelineDetailEntry(entry)}
+                            canEditTimeline={canEditTimeline}
+                            onEdit={setTimelineEditEntry}
+                            onDelete={handleDeleteTimelineEntry}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -888,6 +1038,61 @@ export function EmployeeDetailModal({
           )}
         </div>
       </div>
+
+      {timelineDetailEntry ? (
+        <div
+          className="fixed inset-0 z-[125] flex items-center justify-center px-4 py-8 sm:px-6"
+          role="presentation"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px] dark:bg-black/65"
+            aria-label="Close timeline details"
+            onClick={() => setTimelineDetailEntry(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="timeline-detail-title"
+            className="relative z-10 flex max-h-[min(88dvh,40rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <h3
+                id="timeline-detail-title"
+                className="text-sm font-semibold text-slate-900 dark:text-slate-100"
+              >
+                Timeline details
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTimelineDetailEntry(null)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" strokeWidth={2} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+              <TimelineEntryCard e={timelineDetailEntry} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {timelineEditEntry ? (
+        <EmployeeAddTimelineModal
+          open
+          onClose={() => setTimelineEditEntry(null)}
+          employeeId={employeeId}
+          employeeName={fullName}
+          editEntry={timelineEditEntry}
+          onSaved={() => {
+            setTimelineRefresh((n) => n + 1);
+            setTimelineEditEntry(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

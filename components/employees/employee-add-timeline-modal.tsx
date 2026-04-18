@@ -6,6 +6,8 @@ import { CalendarClock, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   saveEmployeeTimelineEntry,
+  updateEmployeeTimelineEntry,
+  type EmployeeTimelineEntryRow,
   type SaveTimelinePayload,
 } from "@/lib/actions/employee-timeline-data";
 
@@ -27,12 +29,65 @@ const sectionClass = "rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 d
 
 type YesNo = "" | "yes" | "no";
 
+type TimelineHydratedForm = {
+  entryDate: string;
+  punctuality: YesNo;
+  punctualityComment: string;
+  behaviour: "" | "professional" | "non-professional";
+  behaviourComment: string;
+  honesty: YesNo;
+  honestyComment: string;
+  criminalRecord: YesNo;
+  criminalRecordComment: string;
+  dressingComment: string;
+  effort: "" | "hard-work" | "inactive";
+  effortComment: string;
+  others: string;
+};
+
+function hydrateFormFromEntry(row: EmployeeTimelineEntryRow): TimelineHydratedForm {
+  return {
+    entryDate: row.entry_date,
+    punctuality:
+      row.punctuality === "yes" || row.punctuality === "no"
+        ? row.punctuality
+        : "",
+    punctualityComment: row.punctuality_comment ?? "",
+    behaviour:
+      row.behaviour === "professional"
+        ? "professional"
+        : row.behaviour === "non_professional"
+          ? "non-professional"
+          : ("" as const),
+    behaviourComment: row.behaviour_comment ?? "",
+    honesty:
+      row.honesty === "yes" || row.honesty === "no" ? row.honesty : ("" as const),
+    honestyComment: row.honesty_comment ?? "",
+    criminalRecord:
+      row.criminal_misconduct === "yes" || row.criminal_misconduct === "no"
+        ? row.criminal_misconduct
+        : ("" as const),
+    criminalRecordComment: row.criminal_misconduct_comment ?? "",
+    dressingComment: row.dressing_appearance_comment ?? "",
+    effort:
+      row.effort === "hard_work"
+        ? "hard-work"
+        : row.effort === "inactive"
+          ? "inactive"
+          : ("" as const),
+    effortComment: row.effort_comment ?? "",
+    others: row.others ?? "",
+  };
+}
+
 export function EmployeeAddTimelineModal({
   open,
   onClose,
   employeeId,
   employeeName,
   onSaved,
+  /** When set, form updates this row instead of inserting. */
+  editEntry = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,6 +95,7 @@ export function EmployeeAddTimelineModal({
   employeeName: string;
   /** Called after a successful save (e.g. refresh Timeline tab). */
   onSaved?: () => void;
+  editEntry?: EmployeeTimelineEntryRow | null;
 }) {
   const titleId = useId();
 
@@ -60,8 +116,8 @@ export function EmployeeAddTimelineModal({
 
   useEffect(() => {
     if (!open) {
-      setEntryDate(localDateInputValue());
       setSaving(false);
+      setEntryDate(localDateInputValue());
       setPunctuality("");
       setPunctualityComment("");
       setBehaviour("");
@@ -76,12 +132,42 @@ export function EmployeeAddTimelineModal({
       setOthers("");
       return;
     }
+    const h = editEntry ? hydrateFormFromEntry(editEntry) : null;
+    if (h) {
+      setEntryDate(h.entryDate);
+      setPunctuality(h.punctuality);
+      setPunctualityComment(h.punctualityComment);
+      setBehaviour(h.behaviour);
+      setBehaviourComment(h.behaviourComment);
+      setHonesty(h.honesty);
+      setHonestyComment(h.honestyComment);
+      setCriminalRecord(h.criminalRecord);
+      setCriminalRecordComment(h.criminalRecordComment);
+      setDressingComment(h.dressingComment);
+      setEffort(h.effort);
+      setEffortComment(h.effortComment);
+      setOthers(h.others);
+    } else {
+      setEntryDate(localDateInputValue());
+      setPunctuality("");
+      setPunctualityComment("");
+      setBehaviour("");
+      setBehaviourComment("");
+      setHonesty("");
+      setHonestyComment("");
+      setCriminalRecord("");
+      setCriminalRecordComment("");
+      setDressingComment("");
+      setEffort("");
+      setEffortComment("");
+      setOthers("");
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open]);
+  }, [open, editEntry]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -101,13 +187,15 @@ export function EmployeeAddTimelineModal({
       others,
     };
     setSaving(true);
-    const { error } = await saveEmployeeTimelineEntry(employeeId, payload);
+    const { error } = editEntry
+      ? await updateEmployeeTimelineEntry(employeeId, editEntry.id, payload)
+      : await saveEmployeeTimelineEntry(employeeId, payload);
     setSaving(false);
     if (error) {
       toast.error("Could not save timeline", { description: error });
       return;
     }
-    toast.success("Timeline entry saved");
+    toast.success(editEntry ? "Timeline updated" : "Timeline entry saved");
     onSaved?.();
     if (typeof window !== "undefined") {
       window.dispatchEvent(
@@ -148,7 +236,7 @@ export function EmployeeAddTimelineModal({
                 id={titleId}
                 className="text-lg font-semibold text-slate-900 dark:text-slate-100"
               >
-                Add timeline
+                {editEntry ? "Edit timeline" : "Add timeline"}
               </h2>
               <p className="truncate text-sm text-slate-500 dark:text-slate-400">
                 {employeeName || "Employee"}

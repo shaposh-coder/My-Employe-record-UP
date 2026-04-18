@@ -240,6 +240,8 @@ create table if not exists public.employee_timeline_entries (
   effort text,
   effort_comment text not null default '',
   others text not null default '',
+  added_by_email text,
+  added_by_name text,
   constraint employee_timeline_punctuality_chk
     check (punctuality is null or punctuality in ('yes', 'no')),
   constraint employee_timeline_behaviour_chk
@@ -264,6 +266,25 @@ alter table public.employee_timeline_entries
   add column if not exists criminal_misconduct_comment text not null default '';
 alter table public.employee_timeline_entries
   add column if not exists effort_comment text not null default '';
+alter table public.employee_timeline_entries
+  add column if not exists added_by_email text;
+alter table public.employee_timeline_entries
+  add column if not exists added_by_name text;
+
+comment on column public.employee_timeline_entries.added_by_email is
+  'Email of the signed-in user when this row was inserted; null for legacy rows.';
+comment on column public.employee_timeline_entries.added_by_name is
+  'Display name from user_access when the row was inserted.';
+
+alter table public.employee_timeline_entries
+  add column if not exists updated_by_email text;
+alter table public.employee_timeline_entries
+  add column if not exists updated_by_name text;
+
+comment on column public.employee_timeline_entries.updated_by_email is
+  'Email of the user who last updated this row; set on each successful update.';
+comment on column public.employee_timeline_entries.updated_by_name is
+  'Display name from user_access at update time.';
 
 alter table public.employee_timeline_entries enable row level security;
 
