@@ -657,7 +657,7 @@ function DepartmentsWithNestedSections({
   }, [selectedDept, deptCounts, sections, secCounts]);
 
   return (
-    <section className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/30 ring-1 ring-slate-900/[0.03] dark:border-slate-700/70 dark:bg-slate-900 dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.04]">
+    <section className="flex min-h-0 flex-col rounded-3xl border border-slate-200/80 bg-white shadow-lg shadow-slate-200/30 ring-1 ring-slate-900/[0.03] dark:border-slate-700/70 dark:bg-slate-900 dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.45)] dark:ring-white/[0.04]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100/80 bg-gradient-to-r from-violet-50/90 via-white to-fuchsia-50/70 px-4 py-4 sm:px-6 dark:border-violet-950/40 dark:from-violet-950/35 dark:via-slate-900 dark:to-fuchsia-950/25">
         <div className="min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50">
@@ -753,12 +753,12 @@ function DepartmentsWithNestedSections({
         }}
       />
 
-      <div className="flex min-h-[min(28rem,70vh)] flex-col lg:min-h-[min(22rem,65vh)] lg:flex-row">
+      <div className="flex min-h-[min(26rem,60vh)] flex-col lg:max-h-[calc(100dvh-10rem)] lg:min-h-0 lg:flex-row lg:overflow-hidden">
         <aside
-          className="border-b border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white dark:border-slate-800 dark:from-slate-950/80 dark:to-slate-900 lg:w-[min(100%,17.5rem)] lg:shrink-0 lg:border-b-0 lg:border-r"
+          className="border-b border-slate-200/80 bg-gradient-to-b from-slate-50/90 to-white dark:border-slate-800 dark:from-slate-950/80 dark:to-slate-900 lg:flex lg:w-[min(100%,17.5rem)] lg:shrink-0 lg:flex-col lg:overflow-hidden lg:border-b-0 lg:border-r"
           aria-label="Departments"
         >
-          <div className="sticky top-0 max-h-[min(40vh,16rem)] overflow-y-auto p-3 sm:p-4 lg:max-h-none">
+          <div className="sticky top-0 max-h-[min(40vh,16rem)] overflow-y-auto overscroll-contain p-3 sm:p-4 lg:max-h-none lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
             <p className="mb-2 flex items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-widest text-violet-600/90 dark:text-violet-400/90">
               <Building2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
               Departments
@@ -833,7 +833,7 @@ function DepartmentsWithNestedSections({
           </div>
         </aside>
 
-        <div className="min-h-[12rem] flex-1 bg-gradient-to-br from-white via-violet-50/[0.35] to-fuchsia-50/30 p-4 sm:p-6 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/20">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-white via-violet-50/[0.35] to-fuchsia-50/30 p-4 sm:p-6 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/20">
           {!selectedDept ? (
             <div className="flex h-full min-h-[14rem] flex-col items-center justify-center rounded-3xl border border-dashed border-violet-200/60 bg-white/50 px-6 text-center dark:border-violet-900/40 dark:bg-slate-900/30">
               <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-100 to-fuchsia-100 text-2xl dark:from-violet-900/50 dark:to-fuchsia-900/40">
@@ -847,9 +847,9 @@ function DepartmentsWithNestedSections({
               </p>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="flex min-h-0 flex-1 flex-col gap-5">
               {selectedDept && selectedDeptMeta ? (
-                  <div className="rounded-3xl border border-violet-100/70 bg-white/90 p-4 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/70 sm:p-5">
+                  <div className="shrink-0 rounded-3xl border border-violet-100/70 bg-white/90 p-4 shadow-sm dark:border-violet-900/35 dark:bg-slate-900/70 sm:p-5">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-800 dark:bg-violet-500/25 dark:text-violet-200">
@@ -925,8 +925,8 @@ function DepartmentsWithNestedSections({
                   </div>
               ) : null}
 
-              <div className="overflow-hidden rounded-3xl border border-violet-200/50 bg-gradient-to-br from-violet-50/40 via-white to-fuchsia-50/30 shadow-inner shadow-violet-100/50 dark:border-violet-900/40 dark:from-violet-950/30 dark:via-slate-900/90 dark:to-fuchsia-950/20 dark:shadow-none">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100/60 px-4 py-3 dark:border-violet-900/40 sm:px-5">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-violet-200/50 bg-gradient-to-br from-violet-50/40 via-white to-fuchsia-50/30 shadow-inner shadow-violet-100/50 dark:border-violet-900/40 dark:from-violet-950/30 dark:via-slate-900/90 dark:to-fuchsia-950/20 dark:shadow-none">
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-violet-100/60 px-4 py-3 dark:border-violet-900/40 sm:px-5">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 text-white shadow-md">
                       <Layers className="h-4 w-4" strokeWidth={2} aria-hidden />
@@ -960,7 +960,7 @@ function DepartmentsWithNestedSections({
                   </button>
                 </div>
 
-                <div className="p-4 sm:p-5">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
                   {selectedDeptSecList.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-violet-200/70 bg-white/60 px-4 py-10 text-center dark:border-violet-900/50 dark:bg-slate-900/40">
                       <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
