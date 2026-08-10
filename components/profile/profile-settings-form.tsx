@@ -63,7 +63,7 @@ export function ProfileSettingsForm() {
           return;
         }
         const folderPath = `user-avatars/${user.id}`;
-        const url = await uploadEmployeeDocToFolder(supabase, file, folderPath);
+        const url = await uploadEmployeeDocToFolder(file, folderPath);
         setAvatarUrl(url);
         const { error } = await supabase.rpc("update_my_profile", {
           p_full_name: fullName.trim(),

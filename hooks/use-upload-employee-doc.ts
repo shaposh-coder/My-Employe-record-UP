@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { uploadEmployeeDocToFolder } from "@/lib/storage/upload-employee-doc";
 
 export type UseUploadEmployeeDocResult = {
-  /** Upload `file` under `folderPath` in `employee-docs`. Returns public URL or `null` on failure. */
+  /** Upload `file` under `folderPath` in R2. Returns public URL or `null` on failure. */
   upload: (file: File, folderPath: string) => Promise<string | null>;
   /** True while any upload started from this hook is in flight (supports concurrent uploads). */
   loading: boolean;
@@ -15,7 +14,7 @@ export type UseUploadEmployeeDocResult = {
 };
 
 /**
- * Client hook for uploading images to the `employee-docs` Supabase Storage bucket.
+ * Client hook for uploading images to Cloudflare R2 via `/api/uploads`.
  *
  * - `folderPath` is a logical folder (e.g. `drafts/abc-uuid` or `drafts/abc-uuid/profile`).
  *   It is normalized; a unique file name is generated so uploads rarely collide.
@@ -38,8 +37,7 @@ export function useUploadEmployeeDoc(): UseUploadEmployeeDocResult {
       setError(null);
 
       try {
-        const supabase = createClient();
-        const url = await uploadEmployeeDocToFolder(supabase, file, folderPath);
+        const url = await uploadEmployeeDocToFolder(file, folderPath);
         return url;
       } catch (e) {
         const message =

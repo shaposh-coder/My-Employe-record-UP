@@ -100,8 +100,7 @@ export function NewEmployeeForm() {
     setUploadError(null);
     setUploading((u) => ({ ...u, [field]: true }));
     try {
-      const supabase = createClient();
-      const url = await uploadEmployeeDocument(supabase, {
+      const url = await uploadEmployeeDocument({
         draftId,
         slug: UPLOAD_SLUGS[field],
         file,

@@ -1,4 +1,6 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+/**
+ * Client-side helpers for employee document uploads (Cloudflare R2 via API).
+ */
 
 export const EMPLOYEE_DOCS_BUCKET = "employee-docs";
 
@@ -18,7 +20,10 @@ export function normalizeEmployeeDocsFolderPath(folderPath: string): string {
 }
 
 /** Build a unique object path under a folder (timestamp + sanitized original name). */
-export function buildEmployeeDocsObjectPath(folderPath: string, file: File): string {
+export function buildEmployeeDocsObjectPath(
+  folderPath: string,
+  file: File,
+): string {
   const folder = normalizeEmployeeDocsFolderPath(folderPath);
   const ext =
     file.name.includes(".") && file.name.split(".").pop()
@@ -31,54 +36,59 @@ export function buildEmployeeDocsObjectPath(folderPath: string, file: File): str
 }
 
 /**
- * Upload a file to a specific path in `employee-docs` and return its public URL.
+ * Upload a file to a specific path via `/api/uploads` (R2) and return its public URL.
  */
 export async function uploadEmployeeDocByPath(
-  client: SupabaseClient,
   file: File,
   objectPath: string,
 ): Promise<string> {
-  const { error } = await client.storage
-    .from(EMPLOYEE_DOCS_BUCKET)
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      upsert: true,
-    });
+  const form = new FormData();
+  form.set("file", file);
+  form.set("objectPath", normalizeEmployeeDocsFolderPath(objectPath));
 
-  if (error) throw error;
+  const res = await fetch("/api/uploads", {
+    method: "POST",
+    body: form,
+  });
 
-  const { data } = client.storage
-    .from(EMPLOYEE_DOCS_BUCKET)
-    .getPublicUrl(objectPath);
+  const payload = (await res.json().catch(() => null)) as {
+    url?: string;
+    error?: string;
+  } | null;
 
-  return data.publicUrl;
+  if (!res.ok) {
+    throw new Error(payload?.error || `Upload failed (${res.status})`);
+  }
+  if (!payload?.url) {
+    throw new Error("Upload failed: missing URL in response");
+  }
+  return payload.url;
 }
 
 /**
- * Upload to `employee-docs` under `folderPath` using a generated unique file name.
+ * Upload under `folderPath` using a generated unique file name.
  */
 export async function uploadEmployeeDocToFolder(
-  client: SupabaseClient,
   file: File,
   folderPath: string,
 ): Promise<string> {
   const objectPath = buildEmployeeDocsObjectPath(folderPath, file);
-  return uploadEmployeeDocByPath(client, file, objectPath);
+  return uploadEmployeeDocByPath(file, objectPath);
 }
 
 /**
- * Uploads a file to the public `employee-docs` bucket under `drafts/{draftId}/`.
- * Returns the public URL for storing in the database.
+ * Uploads under `drafts/{draftId}/` and returns the public URL for the database.
  */
-export async function uploadEmployeeDocument(
-  client: SupabaseClient,
-  { draftId, slug, file }: UploadOptions,
-): Promise<string> {
+export async function uploadEmployeeDocument({
+  draftId,
+  slug,
+  file,
+}: UploadOptions): Promise<string> {
   const ext =
     file.name.includes(".") && file.name.split(".").pop()
       ? file.name.split(".").pop()!
       : "jpg";
   const safeSlug = slug.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "file";
   const path = `drafts/${draftId}/${safeSlug}.${ext}`;
-  return uploadEmployeeDocByPath(client, file, path);
+  return uploadEmployeeDocByPath(file, path);
 }
