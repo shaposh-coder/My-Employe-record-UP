@@ -2,6 +2,11 @@
  * Client-side helpers for employee document uploads (Cloudflare R2 via API).
  */
 
+import {
+  compressImageForUpload,
+  withJpegExtension,
+} from "@/lib/storage/compress-image";
+
 export const EMPLOYEE_DOCS_BUCKET = "employee-docs";
 
 type UploadOptions = {
@@ -37,14 +42,21 @@ export function buildEmployeeDocsObjectPath(
 
 /**
  * Upload a file to a specific path via `/api/uploads` (R2) and return its public URL.
+ * Images are compressed (JPEG, max 1600px) before upload.
  */
 export async function uploadEmployeeDocByPath(
   file: File,
   objectPath: string,
 ): Promise<string> {
+  const compressed = await compressImageForUpload(file);
+  const path =
+    compressed.type === "image/jpeg"
+      ? withJpegExtension(normalizeEmployeeDocsFolderPath(objectPath))
+      : normalizeEmployeeDocsFolderPath(objectPath);
+
   const form = new FormData();
-  form.set("file", file);
-  form.set("objectPath", normalizeEmployeeDocsFolderPath(objectPath));
+  form.set("file", compressed);
+  form.set("objectPath", path);
 
   const res = await fetch("/api/uploads", {
     method: "POST",
@@ -84,11 +96,7 @@ export async function uploadEmployeeDocument({
   slug,
   file,
 }: UploadOptions): Promise<string> {
-  const ext =
-    file.name.includes(".") && file.name.split(".").pop()
-      ? file.name.split(".").pop()!
-      : "jpg";
   const safeSlug = slug.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "file";
-  const path = `drafts/${draftId}/${safeSlug}.${ext}`;
+  const path = `drafts/${draftId}/${safeSlug}.jpg`;
   return uploadEmployeeDocByPath(file, path);
 }
