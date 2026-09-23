@@ -203,6 +203,16 @@ This app targets **[Vercel](https://vercel.com)** (Next.js–native hosting). Ot
 1. In **Supabase → Authentication → URL configuration**, set **Site URL** to your Vercel URL (e.g. `https://your-app.vercel.app`) and add the same URL under **Redirect URLs** if you use email links or OAuth later.
 2. Log in with the seeded admin (`admin@admin.com` / `admin123`), then **change the password** and rotate credentials for anything exposed during testing.
 
+### Keep Supabase active
+
+The project includes a protected daily Vercel Cron endpoint that makes a lightweight Supabase REST request. This helps prevent inactivity-based pausing on plans where scheduled activity is supported.
+
+1. In Vercel, add `CRON_SECRET` under **Project Settings → Environment Variables** for the Production environment. Use a long random value and redeploy.
+2. Keep `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` configured in Vercel. Vercel invokes `/api/cron` daily from [`vercel.json`](./vercel.json).
+3. The repository also contains a GitHub Actions fallback at [`.github/workflows/keep-supabase-alive.yml`](./.github/workflows/keep-supabase-alive.yml). Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` as GitHub repository secrets if you want both keep-alive mechanisms enabled.
+
+This is a best-effort activity ping, not a replacement for a Supabase plan that does not pause projects. Supabase plan limits and pause policies are controlled by Supabase; upgrade to a plan without automatic pausing if continuous availability is required.
+
 ### Troubleshooting
 
 - **Build fails on Vercel:** Check the build log; often a missing env var or TypeScript error.
